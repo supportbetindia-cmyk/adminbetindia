@@ -1,0 +1,52 @@
+<!doctype html>
+<!--
+  Local test page for bi-click.js. Not part of the deliverable — it exists so
+  the snippet can be exercised before it is handed to the website team.
+
+  Open with ?bi_click=... to simulate arriving from a smart link.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>bi-click.js test</title>
+    <style>
+      body { font-family: system-ui, sans-serif; margin: 40px; max-width: 720px; }
+      pre { background: #f1f5f9; padding: 12px; border-radius: 8px; overflow-x: auto; }
+      .ok { color: #047857; font-weight: 600; }
+      .fail { color: #b91c1c; font-weight: 600; }
+      td { padding: 4px 12px 4px 0; vertical-align: top; }
+    </style>
+  </head>
+  <body>
+    <h1>bi-click.js test</h1>
+
+    <form id="reg">
+      <input type="hidden" name="bi_click" />
+      <input type="hidden" name="bi_click_last" />
+    </form>
+
+    <table id="out"></table>
+
+    <h3>Cookies</h3>
+    <pre id="cookies"></pre>
+
+    <script src="./bi-click.js" defer></script>
+    <script defer>
+      window.addEventListener('load', function () {
+        var form = document.getElementById('reg');
+        var rows = [
+          ['URL parameter', new URLSearchParams(location.search).get('bi_click') || '(none)'],
+          ['BI_CLICK.get()', window.BI_CLICK ? window.BI_CLICK.get() : 'SCRIPT NOT LOADED'],
+          ['BI_CLICK.getFirst()', window.BI_CLICK ? window.BI_CLICK.getFirst() : '-'],
+          ['BI_CLICK.getLast()', window.BI_CLICK ? window.BI_CLICK.getLast() : '-'],
+          ['hidden bi_click', form.elements.bi_click.value || '(empty)'],
+          ['hidden bi_click_last', form.elements.bi_click_last.value || '(empty)']
+        ];
+        document.getElementById('out').innerHTML = rows
+          .map(function (r) { return '<tr><td>' + r[0] + '</td><td><code>' + r[1] + '</code></td></tr>'; })
+          .join('');
+        document.getElementById('cookies').textContent = document.cookie || '(none)';
+      });
+    </script>
+  </body>
+</html>

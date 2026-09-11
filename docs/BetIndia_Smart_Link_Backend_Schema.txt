@@ -1,0 +1,107 @@
+Smart Link Manager
+Backend Database Schema & Integration Handoff
+Version 1.0 | PostgreSQL 16+ | September 2026
+
+## 1. Architecture
+Publisher → Redirect API → Click event → Approved website or WhatsApp → Verified lead/registration/FTD → Attribution → Reporting. All integrations are proposed until provider documentation and access are verified.
+
+## 2. Core database tables
+
+### publishers
+id UUID PK; name TEXT; status TEXT; external_reference TEXT; created_at TIMESTAMPTZ
+
+### campaigns
+id UUID PK; publisher_id UUID FK; name TEXT; status TEXT; starts_at TIMESTAMPTZ; ends_at TIMESTAMPTZ; currency CHAR(3); attribution_window_days INT; created_at TIMESTAMPTZ
+
+### creatives
+id UUID PK; campaign_id UUID FK; name TEXT; format TEXT; asset_reference TEXT; approval_status TEXT
+
+### smart_links
+id UUID PK; campaign_id UUID FK; creative_id UUID FK NULL; slug TEXT UNIQUE; destination_type TEXT; active_destination_id UUID FK; status TEXT; created_at TIMESTAMPTZ
+
+### destinations
+id UUID PK; type TEXT; url TEXT; approval_status TEXT; approved_by UUID NULL; approved_at TIMESTAMPTZ NULL; created_at TIMESTAMPTZ
+
+### destination_versions
+id UUID PK; smart_link_id UUID FK; destination_id UUID FK; version INT; effective_at TIMESTAMPTZ; changed_by UUID; approval_reference TEXT
+
+### click_events
+id UUID PK; click_id TEXT UNIQUE; smart_link_id UUID FK; campaign_id UUID FK; publisher_id UUID FK; creative_id UUID NULL; destination_version_id UUID FK; occurred_at TIMESTAMPTZ; visitor_token_hash TEXT NULL; publisher_click_id TEXT NULL; device_type TEXT; os TEXT; referrer TEXT NULL; ip_hash TEXT NULL; geo_country TEXT NULL; bot_score NUMERIC NULL
+
+### website_sessions
+id UUID PK; click_id TEXT NULL; session_token_hash TEXT; started_at TIMESTAMPTZ; landing_url TEXT; consent_status TEXT; attribution_status TEXT
+
+### website_events
+id UUID PK; session_id UUID FK; event_type TEXT; occurred_at TIMESTAMPTZ; event_key TEXT UNIQUE; metadata JSONB
+
+### whatsapp_events
+id UUID PK; provider TEXT; provider_event_id TEXT; provider_message_id TEXT NULL; event_type TEXT; contact_id TEXT NULL; occurred_at TIMESTAMPTZ; payload_reference TEXT; UNIQUE(provider,provider_event_id)
+
+### leads
+id UUID PK; contact_key TEXT UNIQUE; first_message_at TIMESTAMPTZ; status TEXT; created_at TIMESTAMPTZ
+
+### lead_attributions
+id UUID PK; lead_id UUID FK; click_id TEXT NULL; campaign_id UUID NULL; method TEXT; confidence TEXT; reference_token TEXT NULL; attributed_at TIMESTAMPTZ; evidence_reference TEXT NULL
+
+### registrations
+id UUID PK; source_system TEXT; external_user_id TEXT; registered_at TIMESTAMPTZ; contact_key TEXT NULL; source_event_id TEXT; UNIQUE(source_system,external_user_id)
+
+### conversion_attributions
+id UUID PK; registration_id UUID FK; click_id TEXT NULL; lead_id UUID NULL; campaign_id UUID NULL; model TEXT; confidence TEXT; attributed_at TIMESTAMPTZ; evidence_reference TEXT NULL
+
+### ftd_events
+id UUID PK; registration_id UUID FK; source_system TEXT; external_transaction_id TEXT; amount NUMERIC(18,2); currency CHAR(3); completed_at TIMESTAMPTZ; status TEXT; UNIQUE(source_system,external_transaction_id)
+
+### campaign_costs
+id UUID PK; campaign_id UUID FK; cost_date DATE; amount NUMERIC(18,2); currency CHAR(3); source TEXT; external_reference TEXT NULL
+
+### publisher_reports
+id UUID PK; publisher_id UUID FK; campaign_id UUID FK; report_date DATE; impressions BIGINT NULL; clicks BIGINT NULL; source_reference TEXT; imported_at TIMESTAMPTZ
+
+### webhook_inbox
+id UUID PK; provider TEXT; external_event_id TEXT; payload JSONB; received_at TIMESTAMPTZ; processed_at TIMESTAMPTZ NULL; status TEXT; attempts INT; UNIQUE(provider,external_event_id)
+
+### admin_users
+id UUID PK; email TEXT UNIQUE; role TEXT; status TEXT; created_at TIMESTAMPTZ
+
+### audit_logs
+id UUID PK; actor_id UUID NULL; action TEXT; entity_type TEXT; entity_id UUID; before_data JSONB NULL; after_data JSONB NULL; occurred_at TIMESTAMPTZ
+
+## 3. Relationship & integrity rules
+Use UUID primary keys, explicit foreign keys, UTC timestamps and immutable raw event IDs.
+A campaign belongs to one publisher; a link belongs to one campaign and has one active approved destination.
+Store destination version on each click so later changes never rewrite historical attribution.
+External user IDs and transaction IDs are unique within their source system. FTD is the first eligible completed genuine deposit, not a pending payment or promotional credit.
+Keep raw events separate from deduplicated leads and verified conversions. Never infer a confirmed lead from a redirect.
+
+## 4. Attribution logic
+Generate a cryptographically random click ID. Preserve it through first-party website sessions when permitted. For WhatsApp, validate a supported campaign-reference mechanism against actual Interakt webhook payloads. Do not assume the Click ID survives a WhatsApp redirect. Store exact, campaign-level, or unknown confidence. Define first-click/last-click rules and attribution windows before launch. Keep original and selected attribution separately. Match registrations through authorized identifiers; do not use phone number alone as proof of a click.
+
+## 5. API contracts (proposed)
+GET /c/{slug}: validate active link, record click, return approved redirect; no arbitrary destination URL parameter.
+POST /api/admin/campaigns and /smart-links: authenticated create/update with validation and audit logs.
+POST /api/webhooks/interakt: verify provider authentication/signature as documented, enqueue raw event, acknowledge safely.
+POST /api/integrations/registrations and /ftd: authorized signed ingestion or scheduled import with source IDs and idempotency.
+GET /api/reports/funnel: date range, publisher, campaign, creative, destination and attribution model filters.
+GET /api/reports/export: permission-controlled CSV export with personal-data minimization.
+
+## 6. Indexes & performance
+Index click_events(campaign_id, occurred_at), click_events(publisher_id, occurred_at), click_events(visitor_token_hash, occurred_at), website_sessions(click_id), lead_attributions(click_id), registrations(source_system, external_user_id), ftd_events(registration_id, completed_at), and webhook_inbox(status, received_at). Partition high-volume event tables by month when justified by measured volume. Use asynchronous ingestion and materialized reporting aggregates without losing raw records.
+
+## 7. Reporting definitions
+Clicks = recorded valid click events. Unique visitors = privacy-conscious deduplicated estimate. Website visits = observed sessions. WhatsApp opens = only measurable open events, otherwise unavailable/estimated. WhatsApp leads = distinct contacts with valid incoming message events. Registrations and FTD = verified source records. Ratios use matching cohorts and attribution windows. Publisher impressions/clicks remain separate from first-party counts. Spend and conversions must use consistent date/currency rules.
+
+## 8. Security & operations
+Use HTTPS, RBAC, encrypted secrets, least-privilege database accounts, webhook verification, replay protection, idempotent consumers, retry queues, monitoring, backups and restore tests. Restrict destination hosts and schemes; prevent open redirects and SSRF. Minimize and protect phone/IP data, define retention and deletion policies, and review applicable privacy and advertising requirements. Never store API credentials in source code or audit logs.
+
+## 9. Acceptance tests
+One click creates one unique click ID and redirects only to its approved destination.
+Changing a destination creates an audit/version record and does not alter historical clicks.
+Duplicate webhook delivery does not duplicate a lead, registration or FTD.
+WhatsApp redirect without incoming message does not create a lead.
+Unknown attribution remains unknown; direct and WhatsApp funnels are not mixed.
+Pending/failed deposits are excluded; verified first eligible deposit is counted once.
+Reports reconcile against raw events and source-system totals; permissions and exports are tested.
+
+## 10. Required integration confirmations
+Developer must obtain actual Interakt webhook documentation and sample payloads, registration and transaction API specifications, publisher macros/postback requirements, approved destinations, hosting access, and agreed attribution rules. No integration is represented as already available.

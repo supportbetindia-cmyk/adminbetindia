@@ -1,0 +1,132 @@
+BETINDIA
+Smart Link Manager & Attribution System
+Product Requirements Document | Version 1.0 | 9 September 2026
+Status: Development planning | Domain: go.betindia.bet
+
+## 1. Project Overview
+Build a centralized, transparent tracking and attribution system that generates unique publisher campaign links and measures the journey from click to actual WhatsApp lead, verified registration and first-time depositor (FTD). Each click redirects to one configured, approved destination. Website and WhatsApp campaigns may have separate links.
+Publisher Banner → Smart Link → Click ID → Approved Website or WhatsApp → Lead / Registration → FTD → Attribution Dashboard.
+
+## 2. Business Configuration
+| Field | Value |
+| Brand | BetIndia |
+| Website | https://www.betindia.bet |
+| Smart Link | go.betindia.bet (planned) |
+| Contact | Aaditya | Partnerships & Media Buying |
+| Email | partnerships@betindia.bet |
+| GEO / Devices | India | Android and iOS mobile |
+| Audience | Cricket, Football, Tennis |
+
+## 3. Scope and Roles
+The platform includes campaign management, redirect tracking, website and WhatsApp events, registration and FTD attribution, analytics, cost reporting, audit logs and integration monitoring. It does not assume that any external API or publisher capability already exists.
+| Role | Permissions |
+| Super Admin | Full access, settings, integrations and user management |
+| Campaign Manager | Campaigns, links and approved destinations |
+| Media Buyer | Performance, costs and reports |
+| Analyst | Read-only analytics and exports |
+| Integration Developer | Authorized technical configuration |
+
+## 4. Campaign & Smart Link Management
+| Field | Requirement |
+| Campaign ID / Name | Unique identifier and descriptive name |
+| Publisher / Placement | Publisher, app location and inventory |
+| Creative ID | Banner version and dimensions |
+| Destination | Website or WhatsApp; exact approved URL |
+| Schedule | Start, end, timezone and status |
+| Commercials | Budget, actual spend and currency |
+| Approvals | Publisher approval reference and notes |
+
+Example: https://go.betindia.bet/c/crex-ipl-sep01. Support unique/custom slugs, draft/active/paused/ended states, expiration, role-controlled changes and destination version history. Never silently switch to an unapproved destination.
+
+## 5. Click Tracking & Redirect Engine
+Validate link status and approved destination.
+Generate a unique Click ID and record the click before redirecting.
+Capture campaign, publisher, creative, timestamp, destination version, available referrer, device/OS, UTM parameters and supported publisher click macros.
+Redirect quickly to the single configured destination. Preserve attribution using supported first-party mechanisms.
+Separate raw clicks, filtered clicks and unique visitor estimates; record bot/fraud signals without silently altering raw counts.
+Click IDs are unique event identifiers, not proof of a unique person. IP-derived location and device identification are estimates and must follow privacy requirements.
+
+## 6. Destination & Website Tracking
+Website flow: Banner → Smart Link → Landing Visit → Registration → FTD. Capture landing session, Click ID, page/CTA events, registration start (optional) and verified registration success. A form click is not a registration. The website must preserve attribution through the authorized registration process, subject to consent and technical support.
+WhatsApp flow: Banner → Smart Link → WhatsApp Open → Incoming Message → Actual Lead → Registration → FTD. A redirect or attempted app open is not a confirmed WhatsApp open or lead. WhatsApp opens are measurable only when supported by an observable event; otherwise report redirect clicks as a separate proxy.
+
+## 7. WhatsApp / Interakt Integration
+Verify actual Interakt documentation, webhook payloads and supported attribution methods before development. Required capabilities, where available, include incoming message events, contact/conversation IDs, normalized phone matching, timestamps, webhook authentication, event deduplication, retries and failure monitoring.
+A valid incoming message creates or matches a lead. Repeated messages must not automatically create duplicate unique leads. A unique campaign reference in an approved prefilled message may support attribution, but exact Click ID recovery must be tested. If unavailable, mark attribution as campaign-level, estimated or unknown. Do not claim that a WhatsApp redirect guarantees a webhook or exact user match.
+
+## 8. Lead & User Attribution
+| Record | Key Fields |
+| Lead | Lead ID, normalized phone, first message time, source, Click ID if matched, status, confidence |
+| Registration | User ID, registration time, authorized matching identifier, source, attribution status |
+| FTD | User ID, first genuine deposit time/amount, transaction ID, approved status, original source |
+| Attribution | Click ID, campaign, user/lead reference, model, confidence, attribution timestamps |
+
+Registration and FTD must originate from authorized APIs, webhooks or verified imports. FTD excludes pending, failed, reversed and promotional-credit transactions. Confirm the platform’s genuine deposit and first-deposit definitions. Preserve original attribution and document the selected first-click/last-click model, lookback window, cross-device limitations and handling of unmatched users.
+
+## 9. Analytics Dashboard
+Overview: impressions, clicks, unique estimates, visits, WhatsApp opens, actual leads, registrations, FTD and spend.
+Publisher, campaign, placement and creative performance comparisons.
+Separate website and WhatsApp funnels, with deduplicated users and cohort-based conversion ratios.
+Daily, weekly and monthly reporting; date, publisher, campaign, creative, destination and device filters.
+CSV/Excel exports, source reconciliation, data freshness and attribution confidence indicators.
+| Publisher | Clicks | WA Leads | Registered | FTD |
+| CREX | 10,000 | 600 | 300 | 120 |
+| Cricket Guru | 8,000 | 700 | 400 | 180 |
+
+Illustrative figures only; not actual campaign results.
+
+## 10. Metrics & Cost Formulas
+| Metric | Formula |
+| Click → Lead % | Attributed actual leads / Clicks × 100 |
+| Click → Registration % | Attributed registrations / Clicks × 100 |
+| Lead → Registration % | Registrations from lead cohort / Same cohort leads × 100 |
+| Registration → FTD % | FTD from registration cohort / Same cohort registrations × 100 |
+| Click → FTD % | Attributed FTD / Clicks × 100 |
+| CPC | Spend / Clicks |
+| CPL | Spend / Actual leads |
+| Cost per Registration | Spend / Registrations |
+| Cost per FTD | Spend / FTD |
+
+Use consistent attribution windows and cohorts. Show N/A for zero denominators. Distinguish publisher-reported impressions/clicks from internally recorded clicks. Cost and ROI calculations must use verified financial definitions; deposits are not automatically revenue or profit.
+
+## 11. Publisher Tracking & Reporting
+Confirm whether each publisher permits the tracking URL, website/WhatsApp destination, click macros, third-party trackers, pixels/scripts, conversion postbacks and destination changes. Store approved specifications and reporting access. Ingest publisher impressions, clicks and spend when available, with reconciliation and discrepancy reporting. Never assume a macro, script or postback is supported.
+
+## 12. Database & Technical Architecture
+Recommended entities: admin_users, publishers, campaigns, creatives, smart_links, destination_versions, click_events, website_sessions, whatsapp_events, leads, registrations, ftd_transactions, attribution_links, campaign_costs, publisher_reports, webhook_events and audit_logs.
+Publisher → Campaign → Creative / Smart Link → Click Event → Attribution Link → Lead / Registration / FTD. Campaign costs and publisher reports connect to the campaign. Store UTC timestamps and display IST where appropriate.
+Architecture: Publisher → Smart Link API → Click Database + Redirect Engine → Approved Destination → Website/Interakt Events → Authorized Registration/FTD Integrations → Attribution Service → Analytics Database → Admin Dashboard. Use a reliable backend, relational database and event queue. Final stack depends on infrastructure and verified integration requirements.
+
+## 13. Security, Privacy & Compliance
+HTTPS, authentication, role-based permissions, encrypted secrets and least-privilege API access.
+Webhook signature/authentication verification, idempotency, retry queues, monitoring and rate limiting.
+Minimize and protect phone/IP data; define consent, retention, deletion and access policies.
+Audit all destination, campaign, integration and permission changes.
+Review applicable Indian law and publisher/platform rules before launch. No cloaking, misrepresentation, unauthorized redirects or restriction bypass.
+
+## 14. Development Phases
+| Phase | Deliverables |
+| 1. Foundation | Admin, publishers, campaigns, creatives, Smart Links, redirect engine, click events |
+| 2. Journey & Leads | Website events, Interakt integration, lead matching, attribution references |
+| 3. Conversions | Authorized registration/FTD integration, user matching, attribution rules |
+| 4. Analytics | Costs, ratios, publisher reports, exports, reconciliation, audit and fraud signals |
+
+## 15. Acceptance Criteria
+An admin can create, pause and manage a campaign-specific link with one approved destination.
+Clicks are recorded reliably and redirect to the correct destination without unnecessary delay.
+WhatsApp leads are counted only from valid incoming conversation events; opens and redirects remain separate.
+Verified registrations and FTDs reconcile with authorized source data.
+Duplicate webhook delivery does not inflate counts.
+Dashboard ratios use consistent cohorts, attribution windows and clearly labeled estimates.
+Destination changes are permission-controlled, logged and subject to required publisher approval.
+Integration failures are visible and recoverable; exports and reports reconcile with underlying records.
+
+## 16. Open Dependencies & Decisions
+Confirm DNS, hosting, backend infrastructure and domain ownership.
+Obtain website registration flow and authorized registration API/webhook documentation.
+Obtain authorized transaction API and exact FTD eligibility definitions.
+Review Interakt webhook documentation, payload samples and supported campaign-reference matching.
+Collect publisher tracking macros, reporting specifications and destination approvals.
+Agree attribution model, lookback window, lead deduplication rules and privacy/retention policy.
+Confirm campaign cost import process and financial definitions before ROI reporting.
+Final goal: A reliable, scalable dashboard that connects publisher traffic to actual leads, verified registrations and FTD while clearly distinguishing measured events, estimates and unavailable data.

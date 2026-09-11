@@ -1,0 +1,76 @@
+BetIndia Smart Link Manager
+UI/UX Developer Handoff | Version 1.0 | 09 September 2026
+Purpose: Translate the approved product concept into implementable screens, interactions and design rules. The visual mockup is illustrative; all figures are sample data and integrations remain subject to verification.
+
+## 1. Design direction
+Premium, modern, mobile-first administration interface. Use a dark navy navigation shell with clean light content surfaces, restrained orange actions, strong typography and clear data hierarchy. Avoid decorative clutter and never use color alone to communicate status.
+
+## 2. Design tokens
+| Token | Specification |
+| Navigation background | #050B18 / #0B1F3A |
+| Primary action | #FF6B00 |
+| Content background | #F8FAFC; cards #FFFFFF |
+| Text | #0F172A; secondary #64748B |
+| Typography | Poppins headings, Inter body; system fallbacks |
+| Spacing | 8px base grid; 16-24px card padding |
+| Radius | 8-12px controls; 12-16px cards |
+| Desktop | 1440px reference; sidebar 240px; responsive content |
+| Mobile | 320px minimum; collapsible navigation; no page-level horizontal overflow |
+
+## 3. Navigation and screen inventory
+Sidebar: Dashboard, Publishers, Campaigns, Smart Links, Leads, Registrations, FTD, Reports, Audit Logs, Settings. Top bar: page title, date filter where relevant, account menu and role-aware actions. The interface must respect role-based permissions.
+
+## 4. Dashboard
+Top filters: date range, publisher, campaign, placement, creative, destination and device. KPI cards: publisher impressions (when supplied), tracked clicks, unique click estimates, website visits, WhatsApp opens (only if measurable), actual WhatsApp leads, verified registrations, verified FTD and spend. Display unavailable metrics as N/A, not zero.
+Main content: daily trend chart, separate Website and WhatsApp funnels, publisher performance table and attribution coverage. Every metric must expose its definition and source. All sample numbers in the mockup must be replaced by live or explicitly labeled demo data.
+
+## 5. Publishers
+List and detail screens with publisher name, status, contact, permitted destinations, tracking specifications, campaign count and performance. Publisher detail includes approved creatives, reporting uploads, click macro configuration and approval records. No publisher approval is assumed.
+
+## 6. Campaign creation
+| Field | Interaction / validation |
+| Publisher | Required searchable select |
+| Campaign name | Required text |
+| Placement / Creative ID | Text or linked creative records |
+| Destination type | Required radio: Website OR WhatsApp |
+| Destination URL | Approved URL selection; validate HTTPS and allowlist |
+| Start / End dates | End cannot precede start |
+| Budget / Currency | Optional planned spend; separate actual spend |
+| Status | Draft, Active, Paused, Ended |
+| Notes / Approval | Approval reference and optional evidence |
+
+Create in Draft by default. Activation requires a valid approved destination and authorized permission. Changing destination type or URL must trigger approval checks and create an immutable destination version. Show validation inline and preserve form data after errors.
+
+## 7. Smart Links
+Table columns: Link ID, short URL, publisher, campaign, creative, destination type, destination version, clicks, status, created date and actions. Actions: create, copy, view details, edit permitted fields, pause/resume and view history. Never expose a delete action that destroys historical attribution.
+Create-link flow: select campaign → select approved destination → generate or enter unique slug → preview final destination → save → copy URL. The redirect is single-destination, with no unauthorized fallback or hidden routing.
+
+## 8. Leads
+Searchable table: Lead ID, masked phone, publisher, campaign, first message time, status, registration linkage and attribution confidence. Detail drawer: verified message timeline, source reference, matching evidence, registration status and permitted notes. Repeated messages must not inflate unique lead counts.
+
+## 9. Registrations and FTD
+Registration table: User ID, masked phone, registration timestamp, source, campaign, Click ID where verified, attribution status and FTD status. FTD detail: authorized transaction ID, first completed genuine deposit timestamp and amount, original attribution and verification status. No sensitive financial information beyond role requirements.
+
+## 10. User journey drawer
+Show a chronological timeline: Banner Click → Destination Open (if measurable) → Message Received / Website Visit → Registration → FTD. Each event displays timestamp, source and verification status. Missing events must remain missing; do not invent a continuous journey. Provide exact, campaign-level, estimated and unknown attribution labels.
+
+## 11. Reports
+Publisher, campaign, creative and date-based reports with spend, clicks, leads, registrations, FTD and conversion costs. Export CSV/XLSX with applied filters, date range, timezone, metric definitions and attribution model. Separate publisher-reported clicks from internally recorded clicks. Show reconciliation and unmatched conversion counts.
+
+## 12. Settings and audit
+Settings: user roles, destination allowlist, attribution window/model, integration health, webhook status, data retention and timezone. Audit logs: actor, action, entity, before/after values, timestamp and approval reference. Secrets and raw webhook credentials must never appear in the UI.
+
+## 13. Responsive and accessibility rules
+Desktop tables may use horizontal scrolling within their own container. Mobile uses stacked KPI cards, compact filters, accessible table alternatives and full-width forms. Minimum 44px touch targets, visible focus states, semantic labels, keyboard navigation, adequate contrast, loading skeletons and clear empty/error states are required.
+
+## 14. UI states and acceptance criteria
+Every screen must support loading, empty, error, permission-denied and success states. Filters must update all dependent metrics consistently. Forms must validate before submission. Paused links must show a controlled state. Unknown or unavailable attribution must not be displayed as confirmed. All ratios must use compatible cohorts and denominators.
+
+## 15. Implementation handoff
+Build reusable components: AppShell, Sidebar, PageHeader, FilterBar, MetricCard, DataTable, StatusBadge, FormField, DateRangePicker, ConfirmationDialog, DetailDrawer, Funnel, Timeline and ExportAction. Connect UI to typed backend contracts from the TRD. Use server-side pagination and filtering for large datasets; do not calculate authoritative financial metrics only in the browser.
+Recommended sequence: design tokens and shell → campaign/link workflows → dashboard and reports → lead/user detail → integrations and audit → responsive/accessibility QA. Final API fields and provider capabilities must be confirmed before production implementation.
+
+## 16. Visual reference
+The following concept board illustrates the intended hierarchy and screen relationships. It is not a pixel-perfect specification, and its sample metrics, dates and publisher names are not actual campaign results.
+
+Handoff note: The PRD defines product scope; the TRD defines backend and integration contracts; this document defines interface behavior and visual direction. All three should be reviewed together before development begins.

@@ -1,0 +1,96 @@
+BetIndia Smart Link Manager
+TECHNICAL REQUIREMENTS DOCUMENT
+Version 1.0 | 9 September 2026 | Development planning
+Domain: go.betindia.bet | Owner: Partnerships & Media Buying
+
+## 1. Purpose and scope
+Build a transparent, mobile-first campaign attribution platform connecting publisher traffic to approved website or WhatsApp destinations and verified leads, registrations and first-time deposits (FTD). One click has one configured destination. This document specifies the proposed implementation; external API capabilities and publisher permissions remain subject to verification.
+
+## 2. Architecture
+Publisher → HTTPS redirect API → click event store → approved destination → website or WhatsApp events → identity/attribution service → verified registration and FTD ingestion → analytics warehouse → admin dashboard. Use a transactional relational database, durable event queue, worker processes and a separate reporting layer. Recommended stack: Next.js/TypeScript frontend, Node.js API, PostgreSQL, Redis-backed queue and managed object storage. Final stack depends on existing infrastructure.
+
+## 3. Core modules
+Admin authentication and RBAC; publisher and campaign management; creative and placement management; versioned destination registry; Smart Link resolver; click collection; website SDK; WhatsApp ingestion; lead identity matching; registration and FTD ingestion; attribution engine; cost and publisher report imports; analytics; audit and operational monitoring.
+
+## 4. Data model
+| Table | Required fields / constraints |
+| publishers | id, name, status, external_reference, created_at |
+| campaigns | id, publisher_id, name, status, start_at, end_at, timezone, currency, attribution_policy_id |
+| creatives / placements | id, campaign_id, name, format, placement_id, approved_asset_reference |
+| smart_links | id, campaign_id, slug UNIQUE, destination_id, status, expires_at, created_by |
+| destinations | id, type, canonical_url, approval_status, approval_reference, version, approved_at |
+| click_events | click_id UNIQUE, link_id, campaign_id, creative_id, occurred_at, destination_version, publisher_click_id, device_class, os, referrer, geo_estimate, bot_flags |
+| website_events | event_id UNIQUE, click_id nullable, session_id, event_type, occurred_at, page_path, consent_state |
+| whatsapp_events | provider_event_id UNIQUE, contact_id, event_type, occurred_at, campaign_reference nullable, payload_reference |
+| leads | lead_id, contact_key, first_message_at, status, source_attribution_id nullable |
+| registrations | registration_id UNIQUE, external_user_id UNIQUE, registered_at, contact_key nullable, source_event_id |
+| ftd_events | transaction_id UNIQUE, external_user_id, completed_at, amount, currency, verified_status, source_event_id |
+| attribution_links | id, subject_type, subject_id, click_id nullable, campaign_id nullable, method, confidence, policy_version, attributed_at |
+| costs / publisher_reports | id, campaign_id, date, spend, currency, impressions, publisher_clicks, source_reference |
+| webhook_inbox / audit_logs | event_id, provider, received_at, processing_status, retry_count; actor, action, before/after, timestamp |
+
+Use UUID/ULID identifiers, foreign keys, indexes on campaign/time and external IDs, UTC timestamps, decimal money fields, and explicit nullable attribution. Phone numbers must be normalized and protected; do not expose raw identifiers in reporting exports unnecessarily.
+
+## 5. Redirect API
+GET /c/{slug} validates link status, date window and approved destination version; generates a cryptographically random click_id; records a durable click event; returns HTTP 302/303 with a safe Location header. Use an allowlisted HTTPS destination registry, prevent open redirects and reject arbitrary user-supplied destination URLs. Preserve approved tracking parameters only. A click record must not depend on the destination successfully loading.
+
+## 6. API contracts (proposed)
+| Endpoint | Method / purpose |
+| /api/v1/campaigns | GET, POST; create/list campaigns |
+| /api/v1/campaigns/{id} | GET, PATCH; controlled updates |
+| /api/v1/smart-links | POST; create link from approved destination |
+| /api/v1/smart-links/{id} | GET, PATCH; pause, resume, approved version changes |
+| /api/v1/events/website | POST; consent-aware first-party website events |
+| /api/v1/webhooks/interakt | POST; verified provider event ingestion |
+| /api/v1/webhooks/registrations | POST; authorized registration ingestion |
+| /api/v1/webhooks/transactions | POST; authorized transaction ingestion |
+| /api/v1/reports/funnel | GET; filters and cohort metrics |
+| /api/v1/reports/export | POST; asynchronous authorized export |
+
+All administrative endpoints require authenticated RBAC. Mutations require validation and audit logging. Webhooks require provider-specific authentication/signature verification where supported, replay protection, idempotency and schema validation. Actual provider endpoints and payloads must be confirmed from documentation.
+
+## 7. Click and website identity
+Generate a unique click_id per accepted redirect request. Track total clicks separately from estimated unique visitors, using a consent-aware first-party visitor/session identifier where permitted. Do not equate IP address with a person. Website landing events must preserve click_id through the registration journey using supported first-party storage or server-side session association. Store consent state and do not fingerprint users to bypass privacy choices.
+
+## 8. WhatsApp attribution
+A redirect or WhatsApp open is not a lead. Count a confirmed lead only after a valid inbound message/conversation event is received. Verify Interakt webhook availability, payload schema, contact identifiers, prefilled-message behavior and campaign-reference support. Prefer an approved campaign reference in the prefilled message, then validate whether it survives into the inbound event. Never assume the click_id is returned automatically. Exact click matching requires a demonstrable supported join; otherwise use campaign-level or unknown attribution. Deduplicate provider event IDs and unique leads by the agreed contact identity and reporting window.
+
+## 9. Registration and FTD ingestion
+Use authorized APIs, webhooks or verified imports. Registration success requires an actual external user ID and completed account creation. FTD requires the first genuine completed deposit for the user, with pending, failed, reversed and promotional credits excluded according to confirmed source rules. Store external transaction IDs, status transitions and source timestamps. Never infer FTD from a CTA click or unverified payment event. Reconciliation must handle late arrivals, corrections and duplicate deliveries.
+
+## 10. Attribution engine
+Maintain immutable source events and versioned attribution decisions. Default proposed model: first eligible acquisition click within a configurable 30-day window, subject to business approval. Preserve last-click and assisted-touch data for analysis. Exact click_id joins take precedence; verified campaign references may support campaign-level attribution; unmatched conversions remain unknown. Never distribute unknown conversions proportionally as confirmed results. Define cross-device limitations, existing-user handling, attribution expiration and re-attribution rules before launch.
+
+## 11. Metrics and cohort rules
+Total clicks = accepted click events. Unique visitors = deduplicated estimate, not verified people. Website visits = confirmed landing events. WhatsApp opens = attempted or observed opens only if measurable; otherwise label redirect-to-WhatsApp. Actual leads = unique valid inbound contacts. Registrations and FTD = verified unique external users. Funnel ratios use the same attributed cohort and defined date window. Store event-date and acquisition-cohort reporting separately to avoid misleading conversion rates.
+| Metric | Calculation |
+| Click → Lead | Attributed actual leads / eligible clicks × 100 |
+| Click → Registration | Attributed registrations / eligible clicks × 100 |
+| Lead → Registration | Registrations from lead cohort / leads in cohort × 100 |
+| Registration → FTD | FTD users from registration cohort / registrations in cohort × 100 |
+| CPC / CPL / CPR / Cost per FTD | Spend / corresponding verified metric |
+| ROAS / ROI | Only after revenue, cost and accounting definitions are approved |
+
+## 12. Dashboard and reports
+Provide overview, publishers, campaigns, creatives, Smart Links, leads/users, costs, integrations and audit pages. Filters: date range, publisher, campaign, placement, creative, destination, device and attribution confidence. Show publisher-reported impressions/clicks separately from first-party clicks, plus discrepancies. Include daily, weekly, monthly and cohort reports, CSV/XLSX export, timezone selection and data freshness indicators. Do not present illustrative or missing values as actual performance.
+
+## 13. Publisher integration and compliance
+Record publisher approval evidence, permitted destination types, tracking macros, scripts/tags, postback rules, creative specifications and destination-change requirements. Only enable capabilities explicitly approved by the publisher. No cloaking, surrogate/misleading ads, unauthorized redirects or policy bypass. If the campaign category or destination is prohibited, mark it ineligible. Publisher conversion postbacks must use approved fields, minimize personal data and honor consent and contractual restrictions.
+
+## 14. Security and privacy
+Enforce HTTPS, least-privilege RBAC, MFA for privileged users, secret management, encryption at rest/in transit, CSRF protection where applicable, input validation, rate limits and security headers. Restrict access to raw phone/IP data, redact logs, define retention/deletion schedules, maintain backups and restore tests. Complete legal/privacy review of applicable Indian requirements, consent notices and data-processing agreements before production. No sensitive personal data in click URLs or public logs.
+
+## 15. Reliability and operations
+Use durable webhook inbox and queues, idempotent consumers, exponential retry with dead-letter handling, health checks, structured logs, metrics and alerts. Define SLO targets before launch; proposed targets are 99.9% monthly redirect availability and p95 redirect processing under 300 ms excluding external destination latency. Monitor queue lag, webhook failures, attribution match rate, duplicate rate, redirect errors and reporting freshness. Support safe rollback and destination version recovery.
+
+## 16. Testing and acceptance
+Automated unit, integration, contract, load and security tests are required. Test expired/paused links, unapproved destinations, malformed macros, duplicate clicks, bot signals, missing consent, repeated webhooks, late registration/FTD events, refunds/reversals, unknown attribution and cross-device journeys. Reconcile sample campaign totals against source events and authorized provider reports. Verify one click routes to one approved destination, actual leads require inbound events, and no duplicate FTD is counted. Conduct staging UAT with test data before production.
+
+## 17. Delivery phases
+Phase 1: infrastructure, RBAC, campaigns, destinations, redirect engine and click reports. Phase 2: website tracking and verified WhatsApp ingestion. Phase 3: registration/FTD integration and attribution reconciliation. Phase 4: cost reporting, advanced analytics, publisher integrations and operational hardening. Each phase requires documented API contracts, migrations, automated tests, deployment instructions and acceptance sign-off.
+
+## 18. Open dependencies and decisions
+Confirm domain/DNS and hosting access; existing website and registration technology; authorized registration and transaction API documentation; Interakt webhook payload samples and supported campaign reference method; publisher tracking/approval specifications; approved attribution model/window; privacy/consent requirements; expected traffic volume; reporting retention; budget and infrastructure ownership. No external integration is considered available until verified.
+
+## 19. Definition of done
+Production release requires approved destinations, working end-to-end test journeys, verified source integrations, accurate deduplicated funnel reports, documented unknown attribution, secured administrative access, audit logs, monitoring, backups, reconciliation procedures and written business/compliance approval.
