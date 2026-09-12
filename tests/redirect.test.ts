@@ -282,6 +282,28 @@ test('open redirects are refused: destination hosts must be allowlisted', () => 
   assert.doesNotThrow(() => assertSafeDestination('https://www.betindia.bet/promo'));
 });
 
+test('an empty SMART_LINK_BASE_URL falls back rather than producing a relative URL', async () => {
+  const { shortUrlBase, shortUrlFor } = await import('../src/services/smart-links');
+  const original = process.env.SMART_LINK_BASE_URL;
+
+  try {
+    for (const blank of ['', '   ']) {
+      process.env.SMART_LINK_BASE_URL = blank;
+      assert.ok(
+        shortUrlBase().startsWith('https://'),
+        'a blank env var must not yield an empty base — the URL goes into a publisher banner',
+      );
+      assert.ok(shortUrlFor('x').startsWith('https://'));
+    }
+
+    process.env.SMART_LINK_BASE_URL = 'https://go.betindia.games/';
+    assert.equal(shortUrlFor('abc'), 'https://go.betindia.games/c/abc', 'trailing slash is trimmed');
+  } finally {
+    if (original === undefined) delete process.env.SMART_LINK_BASE_URL;
+    else process.env.SMART_LINK_BASE_URL = original;
+  }
+});
+
 test('inbound query parameters are not forwarded to the destination', () => {
   const url = buildRedirectUrl({
     destinationUrl: 'https://www.betindia.bet/promo?keep=1',

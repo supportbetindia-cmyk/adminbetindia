@@ -48,9 +48,17 @@ export interface SmartLinkFilter {
   status?: SmartLink['status'];
 }
 
-/** Base of the public redirect domain. Configured, never derived from a request. */
+/**
+ * Base of the public redirect domain. Configured, never derived from a request.
+ *
+ * An empty value falls back to the default rather than being used as-is: a
+ * blank env var would otherwise produce a relative URL like `/c/slug`, which
+ * looks fine in the admin UI and is useless the moment a publisher pastes it
+ * into a banner.
+ */
 export function shortUrlBase(): string {
-  return (process.env.SMART_LINK_BASE_URL ?? 'https://go.betindia.bet').replace(/\/+$/, '');
+  const configured = process.env.SMART_LINK_BASE_URL?.trim();
+  return (configured || 'https://go.betindia.games').replace(/\/+$/, '');
 }
 
 export function shortUrlFor(slug: string): string {

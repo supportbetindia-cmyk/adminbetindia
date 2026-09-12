@@ -1,0 +1,25 @@
+# Build artefacts and local state
+node_modules
+.next
+*.tsbuildinfo
+next-env.d.ts
+
+# Secrets — never copied into an image layer
+.env
+.env.local
+.env.test
+.env.*.bak
+.neon
+
+# Local tooling and docs that the runtime does not need
+.git
+.github
+.claude
+tools
+handoff
+docs
+tests
+README.md
+CLAUDE.md
+neon.ts
+betindia-smartlink.zip

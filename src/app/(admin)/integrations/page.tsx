@@ -21,7 +21,9 @@ export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Integrations — Smart Link Manager' };
 
 function webhookUrl(): string {
-  const base = process.env.PUBLIC_APP_URL ?? shortUrlBase();
+  // Same reason as shortUrlBase: an empty env var must not become an empty
+  // base, or the URL shown here is one Interakt cannot call.
+  const base = process.env.PUBLIC_APP_URL?.trim() || shortUrlBase();
   return `${base.replace(/\/+$/, '')}/api/v1/webhooks/interakt`;
 }
 

@@ -82,6 +82,12 @@ node tools/create-database.mjs "postgresql://user:pass@localhost:5432/smartlink_
 Percent-encode any reserved character in the password (`@` → `%40`), or the
 connection URL will not parse.
 
+## Deploying
+
+See [DEPLOYMENT.md](DEPLOYMENT.md) — Docker build, migrations as a separate
+step, boot-time configuration validation, health checks, and what must be true
+before real traffic.
+
 ## Admin API
 
 Every endpoint requires an authenticated session and is authorised by role.

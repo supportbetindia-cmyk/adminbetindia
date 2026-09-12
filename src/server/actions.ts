@@ -1,12 +1,5 @@
 'use server';
 
-/**
- * Server Actions behind the admin forms.
- *
- * Each one is a thin wrapper over the same service the REST API calls, so
- * permission checks, validation and audit logging happen once and cannot
- * diverge between the two transports.
- */
 
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';

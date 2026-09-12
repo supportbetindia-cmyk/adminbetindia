@@ -6,7 +6,7 @@ that are not obvious from the code alone.
 ## What this is
 
 A campaign attribution platform for BetIndia. Publishers run banners containing
-a smart link (`go.betindia.bet/c/{slug}`). A click is recorded, the user is
+a smart link (`go.betindia.games/c/{slug}`). A click is recorded, the user is
 redirected to exactly one approved destination — the website or WhatsApp — and
 the journey is traced through to a verified registration and first-time deposit
 (FTD), so spend can be attributed to real outcomes per publisher, campaign and

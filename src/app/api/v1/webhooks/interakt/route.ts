@@ -17,7 +17,7 @@
  */
 
 import { NextResponse, type NextRequest } from 'next/server';
-import { timingSafeEqual } from 'node:crypto';
+import { createHmac, timingSafeEqual } from 'node:crypto';
 import { db } from '@/db';
 import { captureWebhook, type SignatureStatus } from '@/services/webhooks';
 import { clientIpFrom } from '@/lib/client-signals';
@@ -42,29 +42,43 @@ function ack(body: Record<string, unknown>, status = 200): NextResponse {
 }
 
 /**
- * Shared-secret check.
+ * Signature verification (TRD §6).
  *
- * Interakt's actual authentication scheme is unknown — TRD §6 requires
- * provider-specific signature verification "where supported", and that cannot
- * be implemented against a scheme nobody has documentation for yet.
+ * Interakt sends `interakt-signature`, observed as 71 characters beginning
+ * "sha256" — i.e. `sha256=<64 hex>`, an HMAC-SHA256 over the request body.
+ * The header name and shape are confirmed from a captured event; the exact
+ * signing input is not documented here, so this computes the conventional
+ * HMAC of the raw body.
  *
- * So: if INTERAKT_WEBHOOK_SECRET is set, a matching secret is required in a
- * configurable header. If it is not set, the endpoint accepts unauthenticated
- * events and records them as such, so the gap is visible in the data rather
- * than silently assumed to be fine. Once the real scheme is known from a
- * captured payload, this is where it replaces the shared secret.
+ * Deliberately OBSERVE-ONLY by default. If this computation is wrong and the
+ * endpoint rejected on mismatch, every genuine event would be refused and
+ * lost — the opposite of what a durable inbox is for. So the result is
+ * recorded on each row and requests are still accepted, until
+ * INTERAKT_REQUIRE_VALID_SIGNATURE=true is set once `valid` is confirmed on
+ * real traffic.
  */
-function verifySecret(request: NextRequest): SignatureStatus {
-  const expected = process.env.INTERAKT_WEBHOOK_SECRET;
-  if (!expected) return 'not_configured';
+const SIGNATURE_HEADER = process.env.INTERAKT_SIGNATURE_HEADER ?? 'interakt-signature';
 
-  const headerName = process.env.INTERAKT_WEBHOOK_SECRET_HEADER ?? 'x-webhook-secret';
-  const provided = request.headers.get(headerName) ?? '';
+function verifySignature(request: NextRequest, rawBody: string): SignatureStatus {
+  const secret = process.env.INTERAKT_WEBHOOK_SECRET;
+  if (!secret) return 'not_configured';
 
-  const a = Buffer.from(provided);
-  const b = Buffer.from(expected);
+  const header = request.headers.get(SIGNATURE_HEADER);
+  if (!header) return 'invalid';
+
+  // Accept both "sha256=<hex>" and a bare hex digest.
+  const provided = header.includes('=') ? header.slice(header.indexOf('=') + 1).trim() : header.trim();
+  const expected = createHmac('sha256', secret).update(rawBody, 'utf8').digest('hex');
+
+  const a = Buffer.from(provided.toLowerCase(), 'utf8');
+  const b = Buffer.from(expected, 'utf8');
   if (a.length !== b.length) return 'invalid';
   return timingSafeEqual(a, b) ? 'valid' : 'invalid';
+}
+
+/** Only refuse on a bad signature once the computation is proven on real events. */
+function enforcingSignature(): boolean {
+  return process.env.INTERAKT_REQUIRE_VALID_SIGNATURE === 'true';
 }
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
@@ -75,14 +89,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return ack({ accepted: false, reason: 'rate_limited' }, 429);
   }
 
-  const signatureStatus = verifySecret(request);
-  if (signatureStatus === 'invalid') {
-    // Refused, and deliberately not stored — an unauthenticated caller must
-    // not be able to fill the inbox.
-    console.warn('[webhook:interakt] rejected: secret did not match');
-    return ack({ accepted: false, reason: 'unauthorized' }, 401);
-  }
-
+  // The body is read first: the signature is computed over it, so it cannot be
+  // verified before it exists.
   let rawBody: string;
   try {
     rawBody = await request.text();
@@ -93,6 +101,19 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   if (Buffer.byteLength(rawBody, 'utf8') > MAX_BODY_BYTES) {
     console.warn('[webhook:interakt] rejected: body too large');
     return ack({ accepted: false, reason: 'payload_too_large' }, 413);
+  }
+
+  const signatureStatus = verifySignature(request, rawBody);
+
+  if (signatureStatus === 'invalid' && enforcingSignature()) {
+    console.warn('[webhook:interakt] rejected: signature did not verify');
+    return ack({ accepted: false, reason: 'unauthorized' }, 401);
+  }
+
+  if (signatureStatus === 'invalid') {
+    // Recorded, not refused. Until the signing input is proven against real
+    // traffic, rejecting would discard genuine events over our own bug.
+    console.warn('[webhook:interakt] signature did not verify (observe mode, event still stored)');
   }
 
   // A non-JSON body is still captured. Discovering that Interakt posts form
