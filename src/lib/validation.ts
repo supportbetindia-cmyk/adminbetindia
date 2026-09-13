@@ -187,18 +187,35 @@ export const destinationRejectSchema = z.object({
 
 // ── Smart links ──────────────────────────────────────────────
 
+/**
+ * Link expiry is optional: null means the link never expires, which is the
+ * normal case for an ongoing campaign.
+ *
+ * When one IS given it must be comfortably in the future. A `datetime-local`
+ * picker defaults its time component to 00:00 or the current moment, so
+ * choosing today's date silently produces a link that dies within hours — and
+ * a publisher is left running a banner that no longer redirects. Refusing
+ * anything under an hour catches that before it reaches inventory.
+ */
+const MIN_EXPIRY_MS = 60 * 60 * 1000;
+
+const futureExpiry = dateInput.refine(
+  (value) => value === null || value.getTime() > Date.now() + MIN_EXPIRY_MS,
+  { message: 'Expiry must be at least an hour from now. Leave it blank for a link that never expires.' },
+);
+
 export const smartLinkCreateSchema = z.object({
   campaignId: uuidSchema,
   creativeId: uuidSchema.optional().nullable(),
   slug: slugSchema,
   destinationId: uuidSchema,
-  expiresAt: dateInput,
+  expiresAt: futureExpiry,
   notes: optionalText(2000),
 });
 
 export const smartLinkUpdateSchema = z.object({
   creativeId: uuidSchema.optional().nullable(),
-  expiresAt: dateInput,
+  expiresAt: futureExpiry,
   notes: optionalText(2000),
   status: z.enum(['draft', 'active', 'paused', 'ended']).optional(),
 });

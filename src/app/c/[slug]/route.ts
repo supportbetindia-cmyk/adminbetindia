@@ -13,6 +13,7 @@ import { resolveAndRecordClick } from '@/services/redirect';
 import { clientIpFrom, deriveClientSignals } from '@/lib/client-signals';
 import { hashIp, hashVisitorToken } from '@/lib/privacy';
 import { generateVisitorToken } from '@/lib/ids';
+import { lookupGeo } from '@/lib/geo';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -73,11 +74,20 @@ export async function GET(
     }
   }
 
+  /*
+   * Geo is resolved here, where the raw IP exists, and only the estimate is
+   * passed on. The address itself never reaches the service or the database —
+   * it is hashed on the next line and discarded (PRD §13, Schema §8).
+   */
+  const clientIp = clientIpFrom(headers);
+  const geo = await lookupGeo(clientIp, headers);
+
   const outcome = await resolveAndRecordClick(db, {
     slug,
     signals,
     referrer: headers.get('referer')?.slice(0, 1024) ?? null,
-    ipHash: hashIp(clientIpFrom(headers)),
+    ipHash: hashIp(clientIp),
+    geo,
     visitorTokenHash: hashVisitorToken(visitorToken),
     publisherClickId,
     utm: {

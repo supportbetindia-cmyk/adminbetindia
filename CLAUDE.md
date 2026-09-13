@@ -45,8 +45,15 @@ avoid.
 4. **Not every deposit is an FTD.** Pending, failed, reversed and promotional
    credits are excluded. (PRD §8, TRD §9)
 5. **The click ID does not survive a WhatsApp redirect.** Never assume it comes
-   back. Until tested against real Interakt payloads, WhatsApp attribution is
-   campaign-level at best. (PRD §7, TRD §8, Schema §4)
+   back. WhatsApp attribution is campaign-level at best. (PRD §7, TRD §8, Schema §4)
+
+   **TESTED 12 Sept 2026 against live Interakt webhooks.** A campaign code
+   placed in the prefilled message *does* survive into the inbound event:
+   `data.message.message` contained `"Hi [BI-TEST-001]"` exactly. So WhatsApp
+   attribution is **campaign-level — confirmed, not assumed**. It is still not
+   click-level: the code identifies the campaign, never the individual click,
+   and a user who edits the prefilled text before sending arrives unattributed.
+   Per-click WhatsApp matching must still never be promised.
 6. **Unknown attribution stays unknown.** Never distribute unmatched conversions
    proportionally to make a report look complete. (TRD §10)
 7. **Never redirect to an unapproved destination.** The destination registry is
@@ -190,10 +197,23 @@ scripts, synchronous export) are listed in README.md.
 Nothing in Feature 1 is blocked. Later features are, and the code should keep
 integration boundaries behind adapters until these are answered:
 
-- Interakt webhook payload samples, and whether a campaign reference in a
-  prefilled message survives into the inbound event. **Test this before
-  building Feature 5** — it determines whether WhatsApp attribution is exact,
-  campaign-level, or unknown.
+- ~~Interakt webhook payload samples, and whether a campaign reference survives
+  into the inbound event.~~ **ANSWERED 12 Sept 2026.** Verified against live
+  webhooks on the Growth+ plan (inbound message events require a paid tier).
+  Confirmed payload shape for `type: "message_received"`:
+
+  | Field | Purpose |
+  |---|---|
+  | `data.message.id` | Per-message UUID — the idempotency key |
+  | `data.message.message` | Message text; carries the `[BI-…]` campaign code |
+  | `data.message.chat_message_type` | `"CustomerMessage"` distinguishes inbound |
+  | `data.message.message_content_type` | `"Text"` or `"InteractiveButtonReply"` |
+  | `data.customer.id` | Stable contact UUID — the lead identity |
+  | `data.customer.phone_number` + `country_code` | Contact details (PII) |
+
+  Authentication is `interakt-signature: sha256=<64 hex>` (HMAC-SHA256).
+  Verification is implemented in observe-only mode until proven on live
+  traffic — see the route handler.
 - The registration and transaction APIs from the betting platform, plus the
   exact FTD eligibility rule.
 - Per-publisher approval of the tracking URL, macros and destination type.

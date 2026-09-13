@@ -522,6 +522,50 @@ export async function attributionCoverage(
   };
 }
 
+export interface GeoRow {
+  city: string | null;
+  region: string | null;
+  country: string | null;
+  clicks: number;
+  uniqueEstimate: number;
+}
+
+/**
+ * Clicks grouped by estimated location.
+ *
+ * Always an estimate (PRD §5). On Indian mobile traffic in particular, city
+ * accuracy is weak — carriers route through regional gateways, so a user in a
+ * tier-2 city frequently resolves to the state capital. Rows where no location
+ * could be derived are returned with null values and counted, rather than
+ * dropped: a report that silently omits a third of its traffic is worse than
+ * one that says "unknown".
+ */
+export async function geoBreakdown(
+  db: Db,
+  actor: ActorContext,
+  rawFilter: unknown,
+  limit = 50,
+): Promise<GeoRow[]> {
+  requirePermission(actor, 'reports:read');
+  const filter = parseInput(reportFilterSchema, rawFilter ?? {});
+  const window = resolveWindow(filter);
+
+  return db
+    .select({
+      city: clickEvents.geoCity,
+      region: clickEvents.geoRegion,
+      country: clickEvents.geoCountry,
+      clicks: sql<number>`count(*)::int`,
+      uniqueEstimate: sql<number>`count(distinct ${clickEvents.visitorTokenHash})::int`,
+    })
+    .from(clickEvents)
+    .innerJoin(smartLinks, eq(smartLinks.id, clickEvents.smartLinkId))
+    .where(and(...clickConditions(filter, window)))
+    .groupBy(clickEvents.geoCity, clickEvents.geoRegion, clickEvents.geoCountry)
+    .orderBy(sql`4 desc`)
+    .limit(limit);
+}
+
 /** Rows behind the clicks report, for CSV export and the Reports table. */
 export async function clickDetail(
   db: Db,

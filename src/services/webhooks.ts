@@ -75,13 +75,21 @@ export function describeHeaders(headers: Record<string, string>): Record<string,
 }
 
 /**
- * Common places a provider puts its event identifier.
+ * Where a provider puts its event identifier, most specific first.
  *
- * This is a best guess used only for idempotency, not interpretation. Which
- * field Interakt actually uses is an open question — once a real payload is
- * captured, the correct path replaces this list.
+ * `data.message.id` is CONFIRMED for Interakt from captured `message_received`
+ * events — a per-message UUID, which makes redelivery deduplication exact
+ * rather than a hash of the body (Backend Schema §9).
+ *
+ * The remaining paths are conventional fallbacks for other providers and for
+ * Interakt event types not yet observed. Anything not matched falls back to a
+ * body hash, recorded as such so a guess is never mistaken for a real ID.
  */
 const EVENT_ID_PATHS: string[][] = [
+  // Confirmed — Interakt inbound message events.
+  ['data', 'message', 'id'],
+
+  // Conventional fallbacks, unverified.
   ['id'],
   ['event_id'], ['eventId'],
   ['message_id'], ['messageId'],

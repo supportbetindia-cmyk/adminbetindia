@@ -459,6 +459,40 @@ test('an ended campaign and an ended link cannot be reopened', async () => {
   await rejects(() => updateCampaign(db, actor, campaign.id, { status: 'active' }), 'precondition_failed');
 });
 
+test('link expiry is optional, and a near-immediate expiry is refused', async () => {
+  const actor = await actorWithRole('super_admin');
+  const publisher = await approvedPublisher(actor);
+  const campaign = await createCampaign(db, actor, { publisherId: publisher.id, name: 'Expiry test' });
+  const destination = await approvedDestination(actor);
+
+  const base = { campaignId: campaign.id, destinationId: destination.id };
+
+  // Blank means "never expires" — the normal case for an ongoing campaign.
+  const noExpiry = await createSmartLink(db, actor, { ...base, slug: `t-noexp-${uniq()}` });
+  assert.equal(noExpiry.expiresAt, null);
+
+  // A datetime-local picker defaults its time to 00:00 or now, so choosing
+  // today silently produces a link that dies within hours.
+  await rejects(
+    () => createSmartLink(db, actor, {
+      ...base, slug: `t-past-${uniq()}`, expiresAt: new Date(Date.now() - 60_000),
+    }),
+    'validation_failed',
+  );
+  await rejects(
+    () => createSmartLink(db, actor, {
+      ...base, slug: `t-soon-${uniq()}`, expiresAt: new Date(Date.now() + 5 * 60_000),
+    }),
+    'validation_failed',
+  );
+
+  // A genuine future expiry is accepted.
+  const dated = await createSmartLink(db, actor, {
+    ...base, slug: `t-future-${uniq()}`, expiresAt: new Date(Date.now() + 30 * 86_400_000),
+  });
+  assert.ok(dated.expiresAt instanceof Date);
+});
+
 test('a duplicate slug is refused', async () => {
   const actor = await actorWithRole('super_admin');
   const publisher = await approvedPublisher(actor);

@@ -86,6 +86,39 @@ Generate a real salt with:
 openssl rand -hex 32
 ```
 
+## Location data (optional)
+
+Clicks record an estimated city, region and country. It is optional: without a
+database the fields read `unavailable` and redirects are unaffected.
+
+1. Download **GeoLite City** in **GeoIP2 Binary (.mmdb)** format from MaxMind —
+   not the CSV editions, which this code cannot read.
+2. Extract `GeoLite2-City.mmdb` from the archive (~63 MB).
+3. Place it at `data/GeoLite2-City.mmdb` and set `GEOIP_DB_PATH`.
+
+The file is gitignored and excluded from the Docker image, so it must be
+mounted or copied onto the host separately:
+
+```
+docker run -v /srv/geoip:/app/data -e GEOIP_DB_PATH=/app/data/GeoLite2-City.mmdb …
+```
+
+Notes:
+
+- **Resolution is a local lookup.** No geolocation API is called. An external
+  request would ship user IPs to a third party with no data-processing
+  agreement, and add 50–200 ms to a redirect budgeted at p95 < 300 ms.
+- **The database is loaded at startup**, not on the first click. Loading the
+  63 MB file costs ~120 ms; without warming, the first click after every deploy
+  pays it. Roughly 63 MB of resident memory — worth knowing on a small instance.
+- **Behind Cloudflare or Vercel**, their geo headers are used instead and no
+  database is needed. Cloudflare gives country free; city is Enterprise-only.
+- **Accuracy on Indian mobile is limited.** Carriers route through regional
+  gateways, so a user in a smaller city often resolves to the state capital.
+  Region is the level worth trusting. The UI labels city as an estimate.
+- MaxMind refreshes weekly. A year-old database drifts as ranges are
+  reassigned; use the permalink from your MaxMind account for scheduled updates.
+
 ## Health checks
 
 | Endpoint | Use |

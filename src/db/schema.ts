@@ -286,7 +286,26 @@ export const clickEvents = pgTable('click_events', {
   os: text('os'),
   referrer: text('referrer'),
   ipHash: text('ip_hash'),
+
+  /**
+   * IP-derived location. Always an ESTIMATE (PRD §5), never a measured fact.
+   *
+   * `geo_region` and `geo_city` go beyond Backend Schema §2, which specifies
+   * `geo_country` alone — recorded here as a deliberate extension.
+   *
+   * On Indian mobile traffic city accuracy is weak: carriers route through
+   * regional gateways, so a user in a tier-2 city frequently resolves to the
+   * state capital. Region is the level worth trusting; city is captured
+   * because it was asked for, and is labelled as an estimate everywhere it is
+   * displayed.
+   *
+   * The raw IP that produced these is never stored — only its salted hash.
+   */
   geoCountry: text('geo_country'),
+  geoRegion: text('geo_region'),
+  geoCity: text('geo_city'),
+  /** 'cdn_header' | 'maxmind' | 'unavailable' — a CDN value is not a database guess. */
+  geoSource: text('geo_source'),
 
   utmSource: text('utm_source'),
   utmMedium: text('utm_medium'),
@@ -306,6 +325,7 @@ export const clickEvents = pgTable('click_events', {
   publisherTimeIdx: index('click_events_publisher_time_idx').on(t.publisherId, t.occurredAt),
   visitorTimeIdx: index('click_events_visitor_time_idx').on(t.visitorTokenHash, t.occurredAt),
   linkTimeIdx: index('click_events_link_time_idx').on(t.smartLinkId, t.occurredAt),
+  geoTimeIdx: index('click_events_geo_time_idx').on(t.geoCity, t.occurredAt),
 }));
 
 // ─────────────────────────────────────────────────────────────

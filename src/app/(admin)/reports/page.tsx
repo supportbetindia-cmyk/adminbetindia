@@ -10,7 +10,7 @@ import { db } from '@/db';
 import { requireActor } from '@/lib/auth/current';
 import { can } from '@/lib/auth/rbac';
 import {
-  attributionCoverage, clickDetail, overviewReport, publisherPerformance,
+  attributionCoverage, clickDetail, geoBreakdown, overviewReport, publisherPerformance,
 } from '@/services/reports';
 import { listPublishers } from '@/services/publishers';
 import { listSelectableCampaigns } from '@/services/campaigns';
@@ -49,7 +49,10 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
     can(actor.user.role, 'campaigns:read') ? listSelectableCampaigns(db, actor) : Promise.resolve([]),
   ]);
 
-  const rows = await clickDetail(db, actor, filter, 200);
+  const [rows, geo] = await Promise.all([
+    clickDetail(db, actor, filter, 200),
+    geoBreakdown(db, actor, filter, 50),
+  ]);
   const from = overview.window.from.toISOString().slice(0, 10);
   const to = overview.window.to.toISOString().slice(0, 10);
   const mayExport = can(actor.user.role, 'reports:export');
@@ -164,6 +167,41 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
         <Notice tone="warn" title="Unmatched conversions">
           {coverage.note}
         </Notice>
+
+        <Card
+          title="Location"
+          description="Estimated from IP address. Never a measured fact (PRD §5) — and on Indian mobile traffic, carriers route through regional gateways, so a user in a smaller city often resolves to the state capital. Treat region as the trustworthy level and city as indicative."
+          flush
+        >
+          {geo.length === 0 ? (
+            <EmptyState title="No clicks in this range" />
+          ) : (
+            <div className="table-wrap">
+              <table className="data">
+                <thead>
+                  <tr>
+                    <th>City</th><th>Region</th><th>Country</th>
+                    <th className="num">Clicks</th><th className="num">Unique estimate</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {geo.map((row, i) => (
+                    <tr key={`${row.city ?? 'unknown'}-${row.region ?? ''}-${i}`}>
+                      <td>
+                        {row.city ?? <span className="subtle">Unknown</span>}
+                        {row.city && <span className="cell-sub">≈ estimate</span>}
+                      </td>
+                      <td>{row.region ?? <span className="subtle">—</span>}</td>
+                      <td>{row.country ?? <span className="subtle">—</span>}</td>
+                      <td className="num">{formatMetric(row.clicks)}</td>
+                      <td className="num">≈ {formatMetric(row.uniqueEstimate)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </Card>
 
         <Card
           title="Click detail"

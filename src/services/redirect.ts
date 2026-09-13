@@ -22,6 +22,7 @@ import {
 import { generateClickId } from '@/lib/ids';
 import { buildRedirectUrl, UnsafeDestinationError } from '@/lib/destination-url';
 import type { ClientSignals } from '@/lib/client-signals';
+import { UNKNOWN_GEO, type GeoEstimate } from '@/lib/geo';
 
 export type RedirectOutcome =
   | { status: 'redirect'; url: string; clickId: string; filtered: boolean }
@@ -37,6 +38,12 @@ export interface RedirectRequest {
   signals: ClientSignals;
   referrer: string | null;
   ipHash: string | null;
+  /**
+   * Already resolved by the caller, which holds the raw IP. The address itself
+   * never enters this service or the database — only its salted hash and this
+   * estimate (PRD §13, Schema §8).
+   */
+  geo?: GeoEstimate;
   visitorTokenHash: string | null;
   /** Publisher click ID captured from an approved macro parameter. */
   publisherClickId: string | null;
@@ -164,6 +171,10 @@ export async function resolveAndRecordClick(
     os: req.signals.os,
     referrer: req.referrer,
     ipHash: req.ipHash,
+    geoCountry: (req.geo ?? UNKNOWN_GEO).country,
+    geoRegion: (req.geo ?? UNKNOWN_GEO).region,
+    geoCity: (req.geo ?? UNKNOWN_GEO).city,
+    geoSource: (req.geo ?? UNKNOWN_GEO).source,
     utmSource: req.utm.source,
     utmMedium: req.utm.medium,
     utmCampaign: req.utm.campaign,

@@ -109,6 +109,89 @@ test('identical unrecognised bodies deduplicate; different ones do not', async (
   assert.equal(third.status, 'stored');
 });
 
+// ─── Real Interakt payloads (captured 12 Sept 2026) ──────────
+
+/**
+ * Trimmed from an actual `message_received` event. Phone number replaced.
+ *
+ * This shape is no longer an assumption: it was captured from Interakt after
+ * enabling "Message received from customers", which is what PRD §7 and TRD §8
+ * required be verified before anything was built on it.
+ */
+function interaktMessageReceived(overrides: {
+  messageId?: string;
+  text?: string;
+  contentType?: string;
+  chatMessageType?: string;
+} = {}) {
+  return {
+    data: {
+      message: {
+        id: overrides.messageId ?? `06aa5047-${uniq()}-7751-8000-dc912733ef76`,
+        message: overrides.text ?? 'Hi [BI-TEST-001]',
+        media_url: null,
+        campaign_id: null,
+        campaign_name: '',
+        message_status: 'Sent',
+        received_at_utc: '2026-09-12T07:51:31.000000',
+        chat_message_type: overrides.chatMessageType ?? 'CustomerMessage',
+        is_template_message: false,
+        message_content_type: overrides.contentType ?? 'Text',
+      },
+      customer: {
+        id: '0f452ba4-83f0-43a1-b5dd-e631d77aa635',
+        traits: { name: '', whatsapp_opted_in: true, _internal_lead_source: 'Whatsapp' },
+        country_code: '+91',
+        phone_number: '9000000000',
+        channel_phone_number: '919000000000',
+      },
+      channel_type: 'Whatsapp',
+      whatsapp_api_number: '918766250172',
+    },
+    type: 'message_received',
+    version: '1.0',
+    timestamp: '2026-09-12T07:51:31.532562',
+  };
+}
+
+test('a real Interakt event is keyed on its message id, not a body hash', () => {
+  const payload = interaktMessageReceived({ messageId: '06aa5047-ad29-7751-8000-dc912733ef76' });
+  const result = deriveEventId(payload, JSON.stringify(payload));
+
+  assert.equal(result.externalEventId, '06aa5047-ad29-7751-8000-dc912733ef76');
+  assert.equal(result.eventIdSource, 'data.message.id');
+});
+
+test('Interakt redelivery of the same message collapses to one row', async () => {
+  const payload = interaktMessageReceived({ messageId: `06aa50-${uniq()}-dedupe` });
+
+  const first = await captureWebhook(db, input(payload));
+  const second = await captureWebhook(db, input(payload));
+
+  assert.equal(first.status, 'stored');
+  assert.equal(second.status, 'duplicate');
+  assert.equal(first.id, second.id);
+});
+
+test('two distinct messages with identical text are both kept', async () => {
+  // Observed live: the same text sent twice arrives as two events with
+  // different message ids. They are genuinely two messages, not a redelivery.
+  const a = await captureWebhook(db, input(interaktMessageReceived({ text: 'Hi [BI-TEST-001]' })));
+  const b = await captureWebhook(db, input(interaktMessageReceived({ text: 'Hi [BI-TEST-001]' })));
+
+  assert.equal(a.status, 'stored');
+  assert.equal(b.status, 'stored');
+  assert.notEqual(a.id, b.id);
+});
+
+test('a captured Interakt message still creates no lead', async () => {
+  const before = (await db.select({ n: sql<number>`count(*)::int` }).from(leads))[0].n;
+  await captureWebhook(db, input(interaktMessageReceived()));
+  const after = (await db.select({ n: sql<number>`count(*)::int` }).from(leads))[0].n;
+
+  assert.equal(after, before, 'capture stores; it does not interpret (PRD §6)');
+});
+
 // ─── Credential handling (Backend Schema §8) ─────────────────
 
 test('credential-bearing header values are never stored', () => {

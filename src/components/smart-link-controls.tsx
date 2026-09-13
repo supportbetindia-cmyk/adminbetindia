@@ -88,8 +88,13 @@ export function SmartLinkForm({
               <Select name="creativeId" placeholder="No creative" options={creatives} />
             </Field>
 
-            <Field label="Expires" name="expiresAt" hint="Optional. After this the link stops redirecting.">
-              <TextInput name="expiresAt" type="datetime-local" />
+            <Field
+              label="Expires"
+              name="expiresAt"
+              error={state.fields?.expiresAt}
+              hint="Leave blank so the link never expires — that is the usual choice. Set a date only for a campaign with a hard end, and remember to set the time too."
+            >
+              <TextInput name="expiresAt" type="datetime-local" error={state.fields?.expiresAt} />
             </Field>
 
             <Field label="Notes" name="notes" wide>
