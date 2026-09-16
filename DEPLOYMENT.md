@@ -93,8 +93,15 @@ database the fields read `unavailable` and redirects are unaffected.
 
 1. Download **GeoLite City** in **GeoIP2 Binary (.mmdb)** format from MaxMind —
    not the CSV editions, which this code cannot read.
-2. Extract `GeoLite2-City.mmdb` from the archive (~63 MB).
-3. Place it at `data/GeoLite2-City.mmdb` and set `GEOIP_DB_PATH`.
+2. Extract `GeoLite2-City.mmdb` from the archive (~63 MB). The archive expands
+   into a **dated folder**, so the file lands at
+   `GeoLite2-City_YYYYMMDD/GeoLite2-City.mmdb`. Either move it up a level or
+   point `GEOIP_DB_PATH` at where it actually is — a path that is one directory
+   off is the single most common reason location stays `unavailable`.
+3. Set `GEOIP_DB_PATH` to its **absolute** path. The built-in default
+   (`./data/GeoLite2-City.mmdb`) is relative to the working directory, which on
+   managed hosting is neither stable nor yours to control.
+4. Restart. The path is read once, at startup.
 
 The file is gitignored and excluded from the Docker image, so it must be
 mounted or copied onto the host separately:
@@ -102,6 +109,15 @@ mounted or copied onto the host separately:
 ```
 docker run -v /srv/geoip:/app/data -e GEOIP_DB_PATH=/app/data/GeoLite2-City.mmdb …
 ```
+
+On hosting that deploys into a versioned directory, keep the file **outside**
+the deploy tree so it survives the next push.
+
+**Checking it.** The Integrations screen has a *Location lookup* panel that
+reports the path being checked, whether the file is there and how big it is,
+whether a client IP is reaching the app at all, and a live lookup of a known
+Indian address. If that panel says the database is loaded and shows a city, it
+works — no need to read the server logs.
 
 Notes:
 

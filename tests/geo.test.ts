@@ -13,7 +13,8 @@ import assert from 'node:assert/strict';
 import { eq } from 'drizzle-orm';
 import { db, pool } from '../src/db';
 import { clickEvents } from '../src/db/schema';
-import { lookupGeo, resetGeoReader, warmGeoReader, UNKNOWN_GEO } from '../src/lib/geo';
+import { geoStatus, lookupGeo, resetGeoReader, warmGeoReader, UNKNOWN_GEO } from '../src/lib/geo';
+import { clientIpSource } from '../src/lib/client-signals';
 
 // ─── Graceful degradation ────────────────────────────────────
 
@@ -105,6 +106,165 @@ test('headers with no geo fields fall through rather than returning empty values
   const headers = new Headers({ 'user-agent': 'Mozilla/5.0', 'content-type': 'text/html' });
   const result = await lookupGeo(null, headers);
   assert.equal(result.source, 'unavailable');
+});
+
+// ─── Diagnostics ─────────────────────────────────────────────
+
+/**
+ * The failure mode here is silent by design: with no database every click
+ * records `unavailable` and nothing else changes, so there is no symptom to
+ * notice. geoStatus() is what turns that into an answer on the Integrations
+ * screen, which means what it reports has to be true — someone will move files
+ * on a server based on it.
+ */
+
+test('geoStatus reports the path it actually tried when the file is missing', async () => {
+  const original = process.env.GEOIP_DB_PATH;
+  process.env.GEOIP_DB_PATH = '/home/nobody/geoip/GeoLite2-City.mmdb';
+  resetGeoReader();
+
+  try {
+    const status = await geoStatus();
+
+    assert.equal(status.loaded, false);
+    assert.equal(status.fileExists, false);
+    assert.equal(status.fileSizeMb, null);
+    assert.equal(
+      status.configuredPath, '/home/nobody/geoip/GeoLite2-City.mmdb',
+      'the exact path must be shown, or the operator cannot check it',
+    );
+    assert.equal(status.pathFromEnv, true, 'an env-supplied path must not be reported as the default');
+    assert.equal(status.sample, null, 'no sample may be claimed when nothing is loaded');
+    assert.ok(status.error, 'the reason is reported rather than left to the server logs');
+  } finally {
+    if (original === undefined) delete process.env.GEOIP_DB_PATH;
+    else process.env.GEOIP_DB_PATH = original;
+    resetGeoReader();
+  }
+});
+
+test('geoStatus distinguishes the built-in default from a configured path', async () => {
+  const original = process.env.GEOIP_DB_PATH;
+  delete process.env.GEOIP_DB_PATH;
+  resetGeoReader();
+
+  try {
+    const status = await geoStatus();
+    assert.equal(
+      status.pathFromEnv, false,
+      'falling back to a relative default is the thing that breaks on managed hosting — it must be visible',
+    );
+  } finally {
+    if (original === undefined) delete process.env.GEOIP_DB_PATH;
+    else process.env.GEOIP_DB_PATH = original;
+    resetGeoReader();
+  }
+});
+
+test('geoStatus proves a loaded database with a real lookup, not just a file check', async () => {
+  resetGeoReader();
+  const status = await geoStatus();
+
+  // Skipped rather than failed when no database is installed locally: this
+  // asserts the shape of a working install, and a developer without the 63MB
+  // file is not a broken build.
+  if (!status.fileExists) {
+    assert.equal(status.loaded, false, 'a missing file must never report as loaded');
+    return;
+  }
+
+  assert.equal(status.loaded, true);
+  assert.ok(status.fileSizeMb && status.fileSizeMb > 1, 'the size tells a .tar.gz apart from the .mmdb');
+  assert.ok(status.sample, 'a working database must be demonstrated, not asserted');
+  assert.equal(status.sample?.result.source, 'maxmind');
+  assert.equal(status.sample?.result.country, 'IN', 'the sample is a known Indian address');
+});
+
+test('geoStatus distinguishes an invisible parent from a missing file', async () => {
+  const original = process.env.GEOIP_DB_PATH;
+
+  try {
+    // The shape seen when the app runs somewhere the configured absolute path
+    // does not exist at all — a container, or a different account.
+    process.env.GEOIP_DB_PATH = '/home/nobody-at-all/geoip/GeoLite2-City.mmdb';
+    resetGeoReader();
+    const invisible = await geoStatus();
+
+    assert.equal(invisible.diagnostics.parentExists, false);
+    assert.equal(invisible.diagnostics.errorCode, 'ENOENT');
+    assert.ok(invisible.diagnostics.cwd, 'the working directory is a path the process is definitely inside');
+
+    // The shape seen when the folder is right but the filename is not. The
+    // listing is what makes the difference obvious.
+    process.env.GEOIP_DB_PATH = './data/not-the-real-name.mmdb';
+    resetGeoReader();
+    const wrongName = await geoStatus();
+
+    if (wrongName.diagnostics.parentExists) {
+      assert.ok(
+        Array.isArray(wrongName.diagnostics.parentEntries),
+        'a readable parent must be listed, or the name mismatch stays invisible',
+      );
+    }
+  } finally {
+    if (original === undefined) delete process.env.GEOIP_DB_PATH;
+    else process.env.GEOIP_DB_PATH = original;
+    resetGeoReader();
+  }
+});
+
+test('a corrected path is picked up without a restart', async () => {
+  const original = process.env.GEOIP_DB_PATH;
+
+  try {
+    // Fail first, which latches the loader so clicks stop paying for a missing
+    // file. This is the state an operator is in while fixing the path.
+    process.env.GEOIP_DB_PATH = '/home/nobody-at-all/GeoLite2-City.mmdb';
+    resetGeoReader();
+    const before = await geoStatus();
+    assert.equal(before.loaded, false);
+
+    // Now point it at a real file, exactly as fixing the setting would.
+    process.env.GEOIP_DB_PATH = './data/GeoLite2-City.mmdb';
+    const after = await geoStatus();
+
+    if (!after.fileExists) return; // no database installed locally
+
+    assert.equal(
+      after.loaded, true,
+      'the latch must not outlive the fix, or the operator concludes the fix failed',
+    );
+    assert.ok(after.sample, 'and the claim is backed by a real lookup');
+
+    // The panel must never claim more than a click would actually get.
+    const click = await lookupGeo('49.36.128.1');
+    assert.equal(click.source, 'maxmind', 'the redirect path sees the same reader');
+  } finally {
+    if (original === undefined) delete process.env.GEOIP_DB_PATH;
+    else process.env.GEOIP_DB_PATH = original;
+    resetGeoReader();
+  }
+});
+
+test('clientIpSource names the header the address came from', () => {
+  assert.deepEqual(
+    clientIpSource(new Headers({ 'x-forwarded-for': '49.36.128.1, 10.0.0.1' })),
+    { header: 'x-forwarded-for', ip: '49.36.128.1' },
+    'only the leftmost entry is the client; the rest are proxies',
+  );
+
+  assert.deepEqual(
+    clientIpSource(new Headers({ 'x-real-ip': '49.36.128.2' })),
+    { header: 'x-real-ip', ip: '49.36.128.2' },
+  );
+
+  // The case the Integrations screen exists to surface: a proxy that forwards
+  // nothing, which makes location unavailable however well the database is
+  // installed.
+  assert.deepEqual(
+    clientIpSource(new Headers({ 'user-agent': 'Mozilla/5.0' })),
+    { header: null, ip: null },
+  );
 });
 
 // ─── Storage (PRD §13, Schema §8) ────────────────────────────

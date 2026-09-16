@@ -174,6 +174,138 @@ export async function lookupGeo(
   }
 }
 
+export interface GeoStatus {
+  /** The path the app is actually looking at, resolved from GEOIP_DB_PATH. */
+  configuredPath: string;
+  /** Whether GEOIP_DB_PATH was set, or the built-in default is in use. */
+  pathFromEnv: boolean;
+  fileExists: boolean;
+  fileSizeMb: number | null;
+  loaded: boolean;
+  /** A live lookup of a known Indian IP, so the answer is proven not assumed. */
+  sample: { ip: string; result: GeoEstimate } | null;
+  error: string | null;
+  /** What the process can see around the path, for when the file is not found. */
+  diagnostics: GeoDiagnostics;
+}
+
+/**
+ * Enough of the process's own view of the filesystem to tell apart the three
+ * reasons a file that visibly exists in a control panel is not visible here:
+ *
+ *  - the app runs in a container or chroot where that absolute path does not
+ *    exist at all (parent missing, ENOENT),
+ *  - the directory is there but not traversable by the app's user (EACCES),
+ *  - the file is there under a different name or one level deeper (parent
+ *    lists, file absent).
+ *
+ * Each has a different fix, and a plain "not found" picks none of them.
+ */
+export interface GeoDiagnostics {
+  cwd: string;
+  /** ENOENT and EACCES mean different things and need different fixes. */
+  errorCode: string | null;
+  parentDir: string;
+  parentExists: boolean;
+  /** What the process can actually list in the parent, or null if it cannot. */
+  parentEntries: string[] | null;
+  parentEntriesTruncated: boolean;
+  parentError: string | null;
+  /** The user the app runs as — not the one that owns the file in the panel. */
+  processUser: string | null;
+}
+
+/** A stable Reliance Jio address, used only to prove the database answers. */
+const SAMPLE_IP = '49.36.128.1';
+
+/**
+ * Reports whether location lookup is actually working, and why not if it is
+ * not.
+ *
+ * Exists because the failure mode is silent by design: a missing database
+ * makes every click record `unavailable` and changes nothing else, so there is
+ * no symptom to notice. Surfacing the path it tried, whether the file is
+ * there, and a real lookup turns "check the server logs" into one screen.
+ */
+export async function geoStatus(): Promise<GeoStatus> {
+  const pathFromEnv = Boolean(process.env.GEOIP_DB_PATH?.trim());
+  const configuredPath = databasePath();
+
+  const { statSync, readdirSync } = await import('node:fs');
+  const { dirname, resolve } = await import('node:path');
+
+  let fileExists = false;
+  let fileSizeMb: number | null = null;
+  let error: string | null = null;
+  let errorCode: string | null = null;
+
+  try {
+    const stat = statSync(configuredPath);
+    fileExists = stat.isFile();
+    fileSizeMb = Number((stat.size / (1024 * 1024)).toFixed(1));
+  } catch (err) {
+    error = err instanceof Error ? err.message : String(err);
+    errorCode = (err as NodeJS.ErrnoException)?.code ?? null;
+  }
+
+  // Resolved, so a relative path is reported as the absolute one the process
+  // actually used — the difference is the whole problem on managed hosting.
+  const parentDir = dirname(resolve(configuredPath));
+  let parentExists = false;
+  let parentEntries: string[] | null = null;
+  let parentEntriesTruncated = false;
+  let parentError: string | null = null;
+
+  if (!fileExists) {
+    try {
+      const entries = readdirSync(parentDir);
+      parentExists = true;
+      parentEntries = entries.slice(0, 20);
+      parentEntriesTruncated = entries.length > 20;
+    } catch (err) {
+      parentError = err instanceof Error ? err.message : String(err);
+    }
+  }
+
+  /**
+   * Retry a failed load when the file is now present.
+   *
+   * getReader() latches after one failure so a missing database costs nothing
+   * per click. Without this, fixing the path would still read "not loaded"
+   * until a restart and the operator would conclude the fix had not worked. A
+   * successful retry populates the shared reader, so the redirect path starts
+   * resolving too and this screen never claims more than clicks actually get.
+   */
+  if (!reader && fileExists) resetGeoReader();
+
+  const db = await getReader();
+  const sample = db
+    ? { ip: SAMPLE_IP, result: await lookupGeo(SAMPLE_IP) }
+    : null;
+
+  return {
+    configuredPath,
+    pathFromEnv,
+    fileExists,
+    fileSizeMb,
+    loaded: Boolean(db),
+    sample,
+    error,
+    diagnostics: {
+      cwd: process.cwd(),
+      errorCode,
+      parentDir,
+      parentExists,
+      parentEntries,
+      parentEntriesTruncated,
+      parentError,
+      processUser: typeof process.getuid === 'function'
+        ? `uid ${process.getuid()}, gid ${process.getgid?.() ?? '?'}`
+        : null,
+    },
+  };
+}
+
 /**
  * Loads the database ahead of the first request.
  *

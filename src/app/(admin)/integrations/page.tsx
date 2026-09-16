@@ -8,10 +8,13 @@
  * It shows the events untouched. No field is interpreted, no lead is implied.
  */
 
+import { headers } from 'next/headers';
 import { db } from '@/db';
 import { requireActor } from '@/lib/auth/current';
+import { clientIpSource } from '@/lib/client-signals';
 import { can } from '@/lib/auth/rbac';
 import { inboxSummary, listInbox } from '@/services/webhooks';
+import { geoStatus } from '@/lib/geo';
 import { shortUrlBase } from '@/services/smart-links';
 import { formatDateTime, formatMetric } from '@/lib/format';
 import { AccountMenu, PageHeader } from '@/components/app-shell';
@@ -33,10 +36,18 @@ export default async function IntegrationsPage() {
     return <PermissionDenied needed="integrations:read" />;
   }
 
-  const [summary, events] = await Promise.all([
+  const [summary, events, geo] = await Promise.all([
     inboxSummary(db, 'interakt'),
     listInbox(db, 'interakt', 25),
+    geoStatus(),
   ]);
+
+  /**
+   * Your own request went through the same proxy chain a click does, so it is
+   * a live probe of whether a client address reaches the app at all. Without
+   * one, location is unavailable no matter how well the database is installed.
+   */
+  const ipSource = clientIpSource(await headers());
 
   const secretConfigured = Boolean(process.env.INTERAKT_WEBHOOK_SECRET);
   const usingBodyHash = summary.eventIdSources.some((s) => s.source === 'body_sha256');
@@ -74,6 +85,144 @@ export default async function IntegrationsPage() {
                       you know whether Interakt can send a custom header.
                     </span></>}
             </div>
+          </div>
+        </Card>
+
+        <Card
+          title="Location lookup"
+          description="IP-derived city on each click. Optional — without a database, location records as unavailable and redirects are unaffected."
+        >
+          <div className="stack">
+            <div className="row">
+              <strong style={{ width: 150 }}>Status</strong>
+              {geo.loaded
+                ? <Badge tone="ok">Database loaded</Badge>
+                : <Badge tone="warn">Not loaded — location will be &ldquo;unavailable&rdquo;</Badge>}
+            </div>
+
+            <div>
+              <span className="metric__label">Looking for the file at</span>
+              <div><code>{geo.configuredPath}</code></div>
+              <span className="field__hint">
+                {geo.pathFromEnv
+                  ? 'From GEOIP_DB_PATH.'
+                  : 'GEOIP_DB_PATH is not set, so the built-in default is being used. On managed hosting set it to an absolute path — a relative one depends on the working directory, which you do not control.'}
+              </span>
+            </div>
+
+            <div className="row">
+              <strong style={{ width: 150 }}>File present</strong>
+              {geo.fileExists
+                ? <Badge tone="ok">Yes — {geo.fileSizeMb} MB</Badge>
+                : <><Badge tone="danger">Not found</Badge>
+                    <span className="muted small">{geo.error}</span></>}
+            </div>
+
+            {!geo.fileExists && (
+              <div>
+                <span className="metric__label">What this process can see</span>
+                <div className="small" style={{ lineHeight: 1.7 }}>
+                  <div>
+                    Working directory: <code>{geo.diagnostics.cwd}</code>
+                  </div>
+                  <div>
+                    Parent folder <code>{geo.diagnostics.parentDir}</code>{' '}
+                    {geo.diagnostics.parentExists
+                      ? <Badge tone="ok">readable</Badge>
+                      : <Badge tone="danger">not readable</Badge>}
+                  </div>
+                  {geo.diagnostics.processUser && (
+                    <div>Running as: <code>{geo.diagnostics.processUser}</code></div>
+                  )}
+                  {geo.diagnostics.parentEntries && (
+                    <div>
+                      Contains:{' '}
+                      {geo.diagnostics.parentEntries.length === 0
+                        ? <span className="subtle">nothing</span>
+                        : <code>
+                            {geo.diagnostics.parentEntries.join(', ')}
+                            {geo.diagnostics.parentEntriesTruncated ? ', …' : ''}
+                          </code>}
+                    </div>
+                  )}
+                  {geo.diagnostics.parentError && (
+                    <div className="muted">Parent folder error: {geo.diagnostics.parentError}</div>
+                  )}
+                </div>
+                <span className="field__hint">
+                  {geo.diagnostics.errorCode === 'EACCES'
+                    ? 'EACCES — the path exists but this process is not allowed to read it. A permissions problem, not a missing file.'
+                    : !geo.diagnostics.parentExists
+                      ? 'The parent folder is not visible either. If the file is plainly there in your control panel, the app is very likely running somewhere that this absolute path does not exist — a container or a different account — and needs a path valid from inside it.'
+                      : 'The folder is readable but does not contain the file under that name. Compare the listing above against the path being checked.'}
+                </span>
+              </div>
+            )}
+
+            <div className="row">
+              <strong style={{ width: 150 }}>Client IP reaching app</strong>
+              {ipSource.ip
+                ? <><Badge tone="ok">Yes</Badge>
+                    <span className="muted small">
+                      via <code>{ipSource.header}</code> — your own address, shown live and not stored.
+                    </span></>
+                : <><Badge tone="danger">No</Badge>
+                    <span className="muted small">
+                      The proxy in front of this app is not forwarding the visitor&rsquo;s address, so
+                      location cannot be derived even with the database installed.
+                    </span></>}
+            </div>
+
+            {geo.sample && (
+              <div>
+                <span className="metric__label">Live test lookup</span>
+                <div>
+                  <code>{geo.sample.ip}</code> →{' '}
+                  {geo.sample.result.city
+                    ? <strong>
+                        {[geo.sample.result.city, geo.sample.result.region, geo.sample.result.country]
+                          .filter(Boolean).join(', ')}
+                      </strong>
+                    : <span className="subtle">no result</span>}
+                </div>
+                <span className="field__hint">
+                  A known Reliance Jio address. If a city appears here, lookup is working.
+                </span>
+              </div>
+            )}
+
+            {!geo.loaded && (
+              <Notice tone="warn" title="How to fix it">
+                <ol style={{ margin: '6px 0 0', paddingLeft: 18 }}>
+                  {!geo.fileExists && !geo.diagnostics.parentExists && (
+                    <li>
+                      Start from the working directory above — it is a path this process is
+                      definitely inside. Put the file somewhere beneath it and set
+                      <code> GEOIP_DB_PATH</code> to that, rather than to a path that only exists
+                      in the control panel&rsquo;s view of the disk.
+                    </li>
+                  )}
+                  <li>
+                    Confirm the file is exactly at the path being checked, under that exact name,
+                    and is the extracted <code>.mmdb</code> (~63&nbsp;MB) rather than the
+                    <code> .tar.gz</code>. MaxMind&rsquo;s archive expands into a dated folder, so
+                    it often sits one level deeper than intended.
+                  </li>
+                  <li>
+                    Keep it outside the deploy directory so it survives the next push, then restart
+                    the app.
+                  </li>
+                </ol>
+              </Notice>
+            )}
+
+            {geo.loaded && (
+              <p className="small muted">
+                City is always an estimate (PRD §5). On Indian mobile traffic especially, carriers
+                route through regional gateways, so a user in a smaller town often resolves to the
+                state capital. Region is the level worth trusting.
+              </p>
+            )}
           </div>
         </Card>
 

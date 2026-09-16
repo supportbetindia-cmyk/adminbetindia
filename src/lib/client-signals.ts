@@ -132,15 +132,41 @@ export function deriveClientSignals(input: SignalInput): ClientSignals {
 }
 
 /**
+ * First client IP from proxy headers, and which header carried it.
+ *
+ * The header name is returned alongside the address because "no IP" and "an IP
+ * from a header we did not expect" are different problems with different fixes,
+ * and neither is visible from the stored data — the address is hashed the
+ * moment it is read (PRD §13). The Integrations screen uses this to show the
+ * live proxy chain.
+ */
+export interface ClientIpSource {
+  /** The header the address came from, or null if none carried one. */
+  header: 'x-forwarded-for' | 'x-real-ip' | 'cf-connecting-ip' | null;
+  ip: string | null;
+}
+
+export function clientIpSource(headers: Headers): ClientIpSource {
+  const xff = headers.get('x-forwarded-for');
+  if (xff) {
+    const first = xff.split(',')[0]?.trim();
+    if (first) return { header: 'x-forwarded-for', ip: first };
+  }
+
+  const real = headers.get('x-real-ip');
+  if (real) return { header: 'x-real-ip', ip: real };
+
+  const cf = headers.get('cf-connecting-ip');
+  if (cf) return { header: 'cf-connecting-ip', ip: cf };
+
+  return { header: null, ip: null };
+}
+
+/**
  * First client IP from proxy headers. Trust only the leftmost entry of
  * x-forwarded-for when the app sits behind a known proxy; behind an untrusted
  * network this header is spoofable and is treated as a weak signal only.
  */
 export function clientIpFrom(headers: Headers): string | null {
-  const xff = headers.get('x-forwarded-for');
-  if (xff) {
-    const first = xff.split(',')[0]?.trim();
-    if (first) return first;
-  }
-  return headers.get('x-real-ip') ?? headers.get('cf-connecting-ip') ?? null;
+  return clientIpSource(headers).ip;
 }
