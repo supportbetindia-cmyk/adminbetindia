@@ -3,13 +3,12 @@
 /**
  * Smart link creation and lifecycle controls (UI/UX §7).
  *
- * No delete action exists anywhere in this file, by instruction: "Never expose
- * a delete action that destroys historical attribution."
+ * Deletion is offered only for links with no click history.
  */
 
 import { useState } from 'react';
 import {
-  changeDestinationAction, createSmartLinkAction, setSmartLinkStatusAction,
+  changeDestinationAction, createSmartLinkAction, deleteSmartLinkAction, setSmartLinkStatusAction,
 } from '@/server/actions';
 import { ActionForm, CopyButton, Field, InlineAction, Select, SubmitButton, TextArea, TextInput } from './form';
 
@@ -114,9 +113,8 @@ export function SmartLinkForm({
               </div>
               {chosen?.type === 'whatsapp' && (
                 <div className="small" style={{ marginTop: 6 }}>
-                  A campaign code is appended to the prefilled message. The click ID is not passed —
-                  it does not survive a WhatsApp redirect, and the user can delete the prefilled text
-                  before sending (PRD §7). WhatsApp attribution is campaign-level at best.
+                  The approved WhatsApp message is used exactly as configured. Track each banner by
+                  assigning it a separate creative and smart link.
                 </div>
               )}
             </div>
@@ -132,9 +130,16 @@ export function SmartLinkForm({
   );
 }
 
-export function SmartLinkStatusControls({ id, status }: { id: string; status: string }) {
+export function SmartLinkStatusControls({ id, status, clickCount }: { id: string; status: string; clickCount: number }) {
   if (status === 'ended') {
-    return <span className="muted small">This link has ended. Ended links cannot be reopened, and their click history is kept.</span>;
+    return (
+      <div className="row">
+        <span className="muted small">This link has ended. Ended links cannot be reopened.</span>
+        {clickCount === 0 && (
+          <InlineAction action={deleteSmartLinkAction} hidden={{ id }} label="Delete link" variant="danger" confirm="Delete this unused link permanently?" />
+        )}
+      </div>
+    );
   }
 
   return (
@@ -157,6 +162,9 @@ export function SmartLinkStatusControls({ id, status }: { id: string; status: st
         variant="danger"
         confirm="End this link permanently? It cannot be reopened. Its click history is preserved."
       />
+      {clickCount === 0 && (
+        <InlineAction action={deleteSmartLinkAction} hidden={{ id }} label="Delete link" variant="danger" confirm="Delete this unused link permanently?" />
+      )}
     </div>
   );
 }

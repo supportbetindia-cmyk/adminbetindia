@@ -34,7 +34,7 @@ export default async function SmartLinkDetailPage({ params }: { params: Promise<
   // Built by the same function the redirect engine uses, so the preview cannot
   // disagree with what a real click does.
   const preview = link.activeDestinationId
-    ? await previewDestination(db, actor, link.activeDestinationId, link.slug).catch(() => null)
+    ? await previewDestination(db, actor, link.activeDestinationId).catch(() => null)
     : null;
 
   const mayWrite = can(actor.user.role, 'links:write');
@@ -73,11 +73,10 @@ export default async function SmartLinkDetailPage({ params }: { params: Promise<
               <div><code className="truncate" title={preview ?? ''}>{preview ?? link.destinationUrl ?? '—'}</code></div>
             </div>
             {link.destinationType === 'whatsapp' && (
-              <Notice tone="warn" title="WhatsApp attribution is campaign-level at best">
-                The click ID does not travel through a WhatsApp redirect. A campaign code is placed in
-                the prefilled message, but the user can delete that text before sending, and whether
-                it survives into an Interakt inbound event is untested (PRD §7, TRD §8). Per-click
-                matching must not be promised on this link.
+              <Notice tone="warn" title="Track banners with separate smart links">
+                WhatsApp receives only the approved prefilled message. Use a different smart link for
+                each banner to measure its redirect clicks. An incoming message cannot be matched back
+                to a banner after the customer enters WhatsApp.
               </Notice>
             )}
           </div>
@@ -99,7 +98,7 @@ export default async function SmartLinkDetailPage({ params }: { params: Promise<
                 <div>{link.expiresAt ? formatDateTime(link.expiresAt) : <span className="subtle">Never</span>}</div>
               </div>
             </div>
-            {mayWrite && <SmartLinkStatusControls id={link.id} status={link.status} />}
+            {mayWrite && <SmartLinkStatusControls id={link.id} status={link.status} clickCount={link.clickCount} />}
           </div>
         </Card>
 

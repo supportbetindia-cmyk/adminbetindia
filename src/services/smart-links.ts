@@ -7,8 +7,8 @@
  *    change creates an immutable new version rather than editing the old one
  *    (UI/UX §6, Backend Schema §3). Historical clicks keep pointing at the
  *    version that was live when they happened.
- *  - There is no delete. UI/UX §7: "Never expose a delete action that destroys
- *    historical attribution." Ending a link is the terminal state.
+ *  - A link may be deleted only before it has recorded a click. Once history
+ *    exists, ending the link is the terminal state and attribution is kept.
  */
 
 import { and, desc, eq, sql } from 'drizzle-orm';
@@ -254,6 +254,43 @@ export async function updateSmartLink(
   return after;
 }
 
+/** Delete an unused link without ever destroying historical attribution. */
+export async function deleteSmartLink(
+  db: Db,
+  actor: ActorContext,
+  id: string,
+): Promise<void> {
+  requirePermission(actor, 'links:write');
+
+  const [link] = await db.select().from(smartLinks).where(eq(smartLinks.id, id)).limit(1);
+  if (!link) throw notFound('Smart link');
+
+  const [usage] = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(clickEvents)
+    .where(eq(clickEvents.smartLinkId, id));
+
+  if ((usage?.count ?? 0) > 0) {
+    throw precondition('This link has click history and cannot be deleted. End it instead.');
+  }
+
+  await db.transaction(async (tx) => {
+    await tx.delete(destinationVersions).where(eq(destinationVersions.smartLinkId, id));
+    await tx.delete(smartLinks).where(eq(smartLinks.id, id));
+  });
+
+  await writeAudit(db, {
+    actor: actor.user,
+    action: 'smart_link.delete_unused',
+    entityType: 'smart_link',
+    entityId: id,
+    summary: `Deleted unused /c/${link.slug}`,
+    before: link,
+    after: null,
+    ipHash: actor.ipHash,
+  });
+}
+
 /**
  * Points a link at a different approved destination.
  *
@@ -351,7 +388,6 @@ export async function previewDestination(
   db: Db,
   actor: ActorContext,
   destinationId: string,
-  slug: string,
 ): Promise<string> {
   requirePermission(actor, 'links:read');
   const destination = await requireApprovedDestination(db, destinationId);
@@ -359,7 +395,6 @@ export async function previewDestination(
     destinationUrl: destination.url,
     kind: destination.type,
     clickId: 'EXAMPLE_CLICK_ID',
-    campaignReference: destination.type === 'whatsapp' ? `BI-${slug.toUpperCase()}` : null,
   });
 }
 

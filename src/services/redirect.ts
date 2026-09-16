@@ -144,10 +144,6 @@ export async function resolveAndRecordClick(
       destinationUrl: row.destination.url,
       kind: row.destination.type,
       clickId,
-      // Campaign reference for WhatsApp is derived from the slug so it is
-      // stable and reversible. Still unverified end to end — see PRD §7.
-      campaignReference:
-        row.destination.type === 'whatsapp' ? `BI-${req.slug.toUpperCase()}` : null,
     });
   } catch (err) {
     if (err instanceof UnsafeDestinationError) {

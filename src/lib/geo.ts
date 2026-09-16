@@ -213,10 +213,71 @@ export interface GeoDiagnostics {
   parentError: string | null;
   /** The user the app runs as — not the one that owns the file in the panel. */
   processUser: string | null;
+  /**
+   * The deepest ancestor of the configured path this process can list.
+   *
+   * On hosting that runs the app in a container, only part of the account's
+   * disk is mounted, and this is where that boundary is: everything at or below
+   * it is real to the app, everything above it only exists in the control
+   * panel's view. Putting the file above the boundary is the mistake that looks
+   * exactly like a missing file.
+   */
+  readableAncestor: DirListing | null;
+}
+
+export interface DirListing {
+  path: string;
+  entries: string[];
+  truncated: boolean;
 }
 
 /** A stable Reliance Jio address, used only to prove the database answers. */
 const SAMPLE_IP = '49.36.128.1';
+
+/** Caps a directory listing so a huge folder cannot flood the page. */
+const MAX_ENTRIES = 20;
+
+function listDir(
+  readdirSync: typeof import('node:fs').readdirSync,
+  dir: string,
+): DirListing | null {
+  try {
+    const entries = readdirSync(dir);
+    return {
+      path: dir,
+      entries: entries.slice(0, MAX_ENTRIES),
+      truncated: entries.length > MAX_ENTRIES,
+    };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Walks up from a path until a directory this process can actually list.
+ *
+ * Bounded rather than unbounded: reaching the filesystem root means there is
+ * nothing useful left to say, and a loop that cannot terminate has no place on
+ * a page that renders during an incident.
+ */
+function findReadableAncestor(
+  readdirSync: typeof import('node:fs').readdirSync,
+  dirname: (p: string) => string,
+  start: string,
+): DirListing | null {
+  let dir = start;
+
+  for (let depth = 0; depth < 24; depth += 1) {
+    const listing = listDir(readdirSync, dir);
+    if (listing) return listing;
+
+    const parent = dirname(dir);
+    if (parent === dir) return null; // reached the root
+    dir = parent;
+  }
+
+  return null;
+}
 
 /**
  * Reports whether location lookup is actually working, and why not if it is
@@ -255,15 +316,19 @@ export async function geoStatus(): Promise<GeoStatus> {
   let parentEntries: string[] | null = null;
   let parentEntriesTruncated = false;
   let parentError: string | null = null;
+  let readableAncestor: DirListing | null = null;
 
   if (!fileExists) {
     try {
       const entries = readdirSync(parentDir);
       parentExists = true;
-      parentEntries = entries.slice(0, 20);
-      parentEntriesTruncated = entries.length > 20;
+      parentEntries = entries.slice(0, MAX_ENTRIES);
+      parentEntriesTruncated = entries.length > MAX_ENTRIES;
     } catch (err) {
       parentError = err instanceof Error ? err.message : String(err);
+      // Only worth walking when the parent itself is unreachable — that is the
+      // case where the mount boundary, not the filename, is the problem.
+      readableAncestor = findReadableAncestor(readdirSync, dirname, parentDir);
     }
   }
 
@@ -302,6 +367,7 @@ export async function geoStatus(): Promise<GeoStatus> {
       processUser: typeof process.getuid === 'function'
         ? `uid ${process.getuid()}, gid ${process.getgid?.() ?? '?'}`
         : null,
+      readableAncestor,
     },
   };
 }

@@ -227,7 +227,7 @@ test('an unknown slug returns not_found', async () => {
   assert.equal(outcome.status, 'not_found');
 });
 
-test('WhatsApp destinations carry a campaign reference in the prefilled text', async () => {
+test('WhatsApp destinations preserve the configured message without an internal reference', async () => {
   const slug = `t-wa-${uniq()}`;
   await fixture({
     slug,
@@ -241,7 +241,8 @@ test('WhatsApp destinations carry a campaign reference in the prefilled text', a
 
   const url = new URL(outcome.url);
   assert.equal(url.hostname, 'wa.me');
-  assert.ok(url.searchParams.get('text')?.includes(`BI-${slug.toUpperCase()}`));
+  assert.equal(url.searchParams.get('text'), 'Hi');
+  assert.ok(!outcome.url.includes('BI-'));
   // The click ID must NOT be pushed into WhatsApp — it does not survive, and
   // pretending otherwise is exactly what PRD §7 warns against.
   assert.ok(!outcome.url.includes(outcome.clickId));

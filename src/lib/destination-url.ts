@@ -62,16 +62,6 @@ export interface BuildRedirectInput {
   destinationUrl: string;
   kind: DestinationKind;
   clickId: string;
-  /**
-   * Campaign reference injected into a WhatsApp prefilled message.
-   *
-   * UNVERIFIED MECHANISM. PRD §7 and TRD §8 require that this be tested against
-   * real Interakt payloads before it is relied on: the code may not survive
-   * into the inbound webhook, and the user can delete the prefilled text before
-   * sending. Until that test passes, treat WhatsApp attribution as campaign
-   * level at best.
-   */
-  campaignReference?: string | null;
   /** Query parameter carrying the click ID to our own website. */
   clickParam?: string;
 }
@@ -87,13 +77,8 @@ export function buildRedirectUrl(input: BuildRedirectInput): string {
     return url.toString();
   }
 
-  // WhatsApp: the only carrier available is the prefilled message body.
-  if (input.campaignReference) {
-    const existing = url.searchParams.get('text') ?? '';
-    const reference = `[${input.campaignReference}]`;
-    if (!existing.includes(reference)) {
-      url.searchParams.set('text', existing ? `${existing} ${reference}` : reference);
-    }
-  }
+  // Keep the approved WhatsApp message exactly as configured. Banner clicks
+  // remain measurable through distinct smart links without exposing an
+  // internal campaign reference to the customer.
   return url.toString();
 }

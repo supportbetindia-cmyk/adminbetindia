@@ -148,12 +148,25 @@ export default async function IntegrationsPage() {
                   {geo.diagnostics.parentError && (
                     <div className="muted">Parent folder error: {geo.diagnostics.parentError}</div>
                   )}
+                  {geo.diagnostics.readableAncestor && (
+                    <div style={{ marginTop: 6 }}>
+                      Deepest folder this app can actually read:{' '}
+                      <code>{geo.diagnostics.readableAncestor.path}</code>
+                      <div>
+                        Contains:{' '}
+                        <code>
+                          {geo.diagnostics.readableAncestor.entries.join(', ')}
+                          {geo.diagnostics.readableAncestor.truncated ? ', …' : ''}
+                        </code>
+                      </div>
+                    </div>
+                  )}
                 </div>
                 <span className="field__hint">
                   {geo.diagnostics.errorCode === 'EACCES'
                     ? 'EACCES — the path exists but this process is not allowed to read it. A permissions problem, not a missing file.'
                     : !geo.diagnostics.parentExists
-                      ? 'The parent folder is not visible either. If the file is plainly there in your control panel, the app is very likely running somewhere that this absolute path does not exist — a container or a different account — and needs a path valid from inside it.'
+                      ? 'The parent folder is not visible to this process. If the file is plainly there in your control panel, the app is running with only part of the disk mounted — anything above the folder named above exists in the panel but not here.'
                       : 'The folder is readable but does not contain the file under that name. Compare the listing above against the path being checked.'}
                 </span>
               </div>
@@ -196,10 +209,10 @@ export default async function IntegrationsPage() {
                 <ol style={{ margin: '6px 0 0', paddingLeft: 18 }}>
                   {!geo.fileExists && !geo.diagnostics.parentExists && (
                     <li>
-                      Start from the working directory above — it is a path this process is
-                      definitely inside. Put the file somewhere beneath it and set
-                      <code> GEOIP_DB_PATH</code> to that, rather than to a path that only exists
-                      in the control panel&rsquo;s view of the disk.
+                      Move the file inside the deepest readable folder named above — that is the
+                      boundary of what this app can see. Prefer a spot beside the build folders
+                      rather than inside one: the working directory is a versioned deploy and is
+                      replaced on every push, so anything left in it is lost.
                     </li>
                   )}
                   <li>
