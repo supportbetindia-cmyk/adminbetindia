@@ -36,8 +36,10 @@ export function middleware(request: NextRequest): NextResponse {
     [
       "default-src 'self'",
       scriptSrc,
-      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-      "font-src 'self' https://fonts.gstatic.com",
+      // Fonts are self-hosted, so no external origin is needed for styles or
+      // fonts. Tighter than allowing Google, and nothing to fail.
+      "style-src 'self' 'unsafe-inline'",
+      "font-src 'self'",
       "img-src 'self' data:",
       "connect-src 'self'",
       "form-action 'self'",

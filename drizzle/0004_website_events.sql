@@ -1,0 +1,2 @@
+CREATE INDEX "website_sessions_started_idx" ON "website_sessions" USING btree ("started_at");--> statement-breakpoint
+ALTER TABLE "website_sessions" ADD CONSTRAINT "website_sessions_session_token_hash_unique" UNIQUE("session_token_hash");

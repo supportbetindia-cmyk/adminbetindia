@@ -11,21 +11,17 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
+    /*
+      Poppins for headings and Inter for body, per UI/UX §2 — declared with
+      @font-face in globals.css and served from /public/fonts.
+
+      There is deliberately no <link> to fonts.googleapis.com here. Next
+      optimizes such links by fetching the stylesheet server-side at render
+      time, which throws `TypeError: fetch failed` on every render if the host
+      cannot reach Google. Self-hosting removes the failure mode and the
+      third-party request together.
+    */
     <html lang="en">
-      <head>
-        {/*
-          Poppins for headings and Inter for body, per UI/UX §2. Loaded by
-          <link> rather than next/font so the build does not require network
-          access; the CSS stack falls back to system fonts if the request
-          fails, which §2 explicitly permits.
-        */}
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link
-          rel="stylesheet"
-          href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@500;600;700&display=swap"
-        />
-      </head>
       <body>{children}</body>
     </html>
   );

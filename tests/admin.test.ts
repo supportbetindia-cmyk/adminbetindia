@@ -749,11 +749,32 @@ test('a metric with no connected source is null, not zero', async () => {
   const actor = await actorWithRole('super_admin');
   const report = await overviewReport(db, actor, { from: '2020-01-01', to: '2020-01-02' });
 
-  for (const key of ['leads', 'registrations', 'ftd', 'whatsapp_opens']) {
+  // `whatsapp_opens` is permanently unavailable — an app open is not observable
+  // at all (PRD §6), so no integration can ever make it measured.
+  const opens = report.metrics.find((m) => m.key === 'whatsapp_opens')!;
+  assert.equal(opens.availability, 'unavailable');
+  assert.equal(opens.value, null);
+
+  /*
+   * The rest flip to `measured` once their source starts producing rows, which
+   * is the whole point of the availability model. Asserting a fixed state here
+   * would make this test fail the moment an integration works — as it did when
+   * registration ingestion was built.
+   *
+   * So the invariant under test is the RULE, not the current state: an
+   * unavailable metric is null so the UI renders N/A, and a measured one has a
+   * real number. Neither may report an unavailable metric as zero.
+   */
+  for (const key of ['leads', 'registrations', 'ftd']) {
     const metric = report.metrics.find((m) => m.key === key)!;
-    assert.equal(metric.availability, 'unavailable', `${key} has no source yet`);
-    assert.equal(metric.value, null, `${key} must be null so the UI renders N/A, never 0`);
-    assert.ok(metric.source.length > 20, `${key} must state why it is unavailable`);
+    assert.ok(metric.source.length > 20, `${key} must always state where it came from or why not`);
+
+    if (metric.availability === 'unavailable') {
+      assert.equal(metric.value, null, `${key} must be null so the UI renders N/A, never 0`);
+    } else {
+      assert.equal(metric.availability, 'measured', `${key} is either measured or unavailable`);
+      assert.ok(typeof metric.value === 'number', `${key} must carry a real count once connected`);
+    }
   }
 });
 

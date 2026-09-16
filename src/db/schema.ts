@@ -335,13 +335,19 @@ export const clickEvents = pgTable('click_events', {
 export const websiteSessions = pgTable('website_sessions', {
   id: uuid('id').primaryKey().defaultRandom(),
   clickId: text('click_id'),
-  sessionTokenHash: text('session_token_hash').notNull(),
+  /**
+   * Unique: one session per token. Later events on the same visit reuse this
+   * row rather than creating a new one, so a visit stays a visit instead of
+   * becoming one-session-per-page-view.
+   */
+  sessionTokenHash: text('session_token_hash').notNull().unique(),
   startedAt: ts('started_at').notNull().defaultNow(),
   landingUrl: text('landing_url'),
   consentStatus: text('consent_status').notNull().default('unknown'),
   attributionStatus: text('attribution_status').notNull().default('unmatched'),
 }, (t) => ({
   clickIdx: index('website_sessions_click_idx').on(t.clickId),
+  startedIdx: index('website_sessions_started_idx').on(t.startedAt),
 }));
 
 export const websiteEvents = pgTable('website_events', {

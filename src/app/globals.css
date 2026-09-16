@@ -10,6 +10,51 @@
  * every availability marker pairs its colour with a text label or a glyph.
  */
 
+/*
+ * Fonts are SELF-HOSTED, not loaded from Google.
+ *
+ * A <link> to fonts.googleapis.com looks harmless, but Next automatically
+ * optimizes Google Fonts stylesheets by fetching the CSS *server-side at
+ * render time*. On a host that cannot reach fonts.googleapis.com that throws
+ * `TypeError: fetch failed` on every page render.
+ *
+ * Serving the files ourselves removes the dependency entirely: no outbound
+ * request, nothing to fail, and no third party told who is loading the admin
+ * panel. Latin subsets only — 72 KB for all four.
+ */
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  /* Variable font: one file covers the whole 400–700 range. */
+  font-weight: 400 700;
+  font-display: swap;
+  src: url('/fonts/inter-latin.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Poppins';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('/fonts/poppins-500-latin.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Poppins';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('/fonts/poppins-600-latin.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Poppins';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('/fonts/poppins-700-latin.woff2') format('woff2');
+}
+
 :root {
   /* Navigation shell */
   --nav-bg: #050b18;
