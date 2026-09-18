@@ -16,7 +16,7 @@ import { createCreative } from '@/services/creatives';
 import {
   approveDestination, createDestination, rejectDestination, revokeDestination,
 } from '@/services/destinations';
-import { changeSmartLinkDestination, createSmartLink, deleteSmartLink, updateSmartLink } from '@/services/smart-links';
+import { changeSmartLinkDestination, createSmartLink, updateSmartLink } from '@/services/smart-links';
 import { createUser, updateUser } from '@/services/users';
 import { recordCampaignCost } from '@/services/costs';
 import { runAction, toPayload, type FormState } from './form-state';
@@ -224,15 +224,6 @@ export async function setSmartLinkStatusAction(_prev: FormState, data: FormData)
     revalidatePath(`/smart-links/${id}`);
     revalidatePath('/smart-links');
     return { ok: true, message: `Link is now ${data.get('status')}.` };
-  });
-}
-
-export async function deleteSmartLinkAction(_prev: FormState, data: FormData): Promise<FormState> {
-  return runAction(data, async () => {
-    const actor = await requireActorOrThrow();
-    await deleteSmartLink(db, actor, String(data.get('id')));
-    revalidatePath('/smart-links');
-    redirect('/smart-links');
   });
 }
 

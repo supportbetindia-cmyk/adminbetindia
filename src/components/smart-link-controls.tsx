@@ -3,12 +3,12 @@
 /**
  * Smart link creation and lifecycle controls (UI/UX §7).
  *
- * Deletion is offered only for links with no click history.
+ * Historical links are ended rather than deleted.
  */
 
 import { useState } from 'react';
 import {
-  changeDestinationAction, createSmartLinkAction, deleteSmartLinkAction, setSmartLinkStatusAction,
+  changeDestinationAction, createSmartLinkAction, setSmartLinkStatusAction,
 } from '@/server/actions';
 import { ActionForm, CopyButton, Field, InlineAction, Select, SubmitButton, TextArea, TextInput } from './form';
 
@@ -130,16 +130,9 @@ export function SmartLinkForm({
   );
 }
 
-export function SmartLinkStatusControls({ id, status, clickCount }: { id: string; status: string; clickCount: number }) {
+export function SmartLinkStatusControls({ id, status }: { id: string; status: string }) {
   if (status === 'ended') {
-    return (
-      <div className="row">
-        <span className="muted small">This link has ended. Ended links cannot be reopened.</span>
-        {clickCount === 0 && (
-          <InlineAction action={deleteSmartLinkAction} hidden={{ id }} label="Delete link" variant="danger" confirm="Delete this unused link permanently?" />
-        )}
-      </div>
-    );
+    return <span className="muted small">This link has ended. Ended links cannot be reopened, and their click history is kept.</span>;
   }
 
   return (
@@ -162,9 +155,6 @@ export function SmartLinkStatusControls({ id, status, clickCount }: { id: string
         variant="danger"
         confirm="End this link permanently? It cannot be reopened. Its click history is preserved."
       />
-      {clickCount === 0 && (
-        <InlineAction action={deleteSmartLinkAction} hidden={{ id }} label="Delete link" variant="danger" confirm="Delete this unused link permanently?" />
-      )}
     </div>
   );
 }

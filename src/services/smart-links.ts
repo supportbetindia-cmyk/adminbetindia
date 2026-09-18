@@ -7,8 +7,8 @@
  *    change creates an immutable new version rather than editing the old one
  *    (UI/UX §6, Backend Schema §3). Historical clicks keep pointing at the
  *    version that was live when they happened.
- *  - A link may be deleted only before it has recorded a click. Once history
- *    exists, ending the link is the terminal state and attribution is kept.
+ *  - There is no delete. UI/UX §7: historical attribution is preserved and
+ *    ending a link is the terminal state.
  */
 
 import { and, desc, eq, sql } from 'drizzle-orm';
@@ -252,43 +252,6 @@ export async function updateSmartLink(
   });
 
   return after;
-}
-
-/** Delete an unused link without ever destroying historical attribution. */
-export async function deleteSmartLink(
-  db: Db,
-  actor: ActorContext,
-  id: string,
-): Promise<void> {
-  requirePermission(actor, 'links:write');
-
-  const [link] = await db.select().from(smartLinks).where(eq(smartLinks.id, id)).limit(1);
-  if (!link) throw notFound('Smart link');
-
-  const [usage] = await db
-    .select({ count: sql<number>`count(*)::int` })
-    .from(clickEvents)
-    .where(eq(clickEvents.smartLinkId, id));
-
-  if ((usage?.count ?? 0) > 0) {
-    throw precondition('This link has click history and cannot be deleted. End it instead.');
-  }
-
-  await db.transaction(async (tx) => {
-    await tx.delete(destinationVersions).where(eq(destinationVersions.smartLinkId, id));
-    await tx.delete(smartLinks).where(eq(smartLinks.id, id));
-  });
-
-  await writeAudit(db, {
-    actor: actor.user,
-    action: 'smart_link.delete_unused',
-    entityType: 'smart_link',
-    entityId: id,
-    summary: `Deleted unused /c/${link.slug}`,
-    before: link,
-    after: null,
-    ipHash: actor.ipHash,
-  });
 }
 
 /**

@@ -98,7 +98,7 @@ export default async function SmartLinkDetailPage({ params }: { params: Promise<
                 <div>{link.expiresAt ? formatDateTime(link.expiresAt) : <span className="subtle">Never</span>}</div>
               </div>
             </div>
-            {mayWrite && <SmartLinkStatusControls id={link.id} status={link.status} clickCount={link.clickCount} />}
+            {mayWrite && <SmartLinkStatusControls id={link.id} status={link.status} />}
           </div>
         </Card>
 

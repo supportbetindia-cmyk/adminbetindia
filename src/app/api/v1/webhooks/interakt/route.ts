@@ -23,6 +23,7 @@ import { captureWebhook, type SignatureStatus } from '@/services/webhooks';
 import { clientIpFrom } from '@/lib/client-signals';
 import { hashIp } from '@/lib/privacy';
 import { rateLimit } from '@/lib/rate-limit';
+import { processInteraktInboxRow } from '@/services/interakt-leads';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -138,6 +139,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       sourceIpHash: ipHash,
       signatureStatus,
     });
+
+    if (signatureStatus === 'valid') await processInteraktInboxRow(db, result.id);
 
     // 200 either way: a duplicate is a successful outcome, not an error, and
     // reporting it as one would make the provider retry indefinitely.

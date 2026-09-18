@@ -12,6 +12,7 @@ import assert from 'node:assert/strict';
 import { eq, sql } from 'drizzle-orm';
 import { db, pool } from '../src/db';
 import { leads, webhookInbox, whatsappEvents } from '../src/db/schema';
+import { processInteraktInboxRow } from '../src/services/interakt-leads';
 import { captureWebhook, deriveEventId, describeHeaders, inboxSummary } from '../src/services/webhooks';
 
 const uniq = () => Math.random().toString(36).slice(2, 10);
@@ -300,6 +301,23 @@ test('the summary reports what is known and what is guessed', async () => {
     summary.eventIdSources.some((s) => s.source === 'id' || s.source === 'body_sha256'),
     'the summary distinguishes a real provider ID from a hash fallback',
   );
+});
+
+test('a verified inbound Interakt customer message becomes one lead', async () => {
+  const captured = await captureWebhook(db, {
+    ...input(interaktMessageReceived({ text: 'Manual Registration' })),
+    signatureStatus: 'valid',
+  });
+
+  assert.equal(await processInteraktInboxRow(db, captured.id), 'processed');
+  assert.equal(await processInteraktInboxRow(db, captured.id), 'processed');
+
+  const eventRows = await db.select().from(whatsappEvents)
+    .where(eq(whatsappEvents.providerEventId, captured.externalEventId));
+  assert.equal(eventRows.length, 1, 'redelivery cannot duplicate the WhatsApp event');
+
+  const leadRows = await db.select().from(leads).where(eq(leads.contactKey, '+919000000000'));
+  assert.equal(leadRows.length, 1, 'one contact becomes one lead');
 });
 
 test.after(async () => {

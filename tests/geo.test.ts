@@ -213,6 +213,56 @@ test('geoStatus distinguishes an invisible parent from a missing file', async ()
   }
 });
 
+test('geoStatus walks up to the deepest folder it can actually read', async () => {
+  const original = process.env.GEOIP_DB_PATH;
+
+  try {
+    // A path whose immediate parent is unreachable but whose grandparent is
+    // fine — the shape produced by hosting that mounts only part of the disk.
+    process.env.GEOIP_DB_PATH = './data/no-such-folder/GeoLite2-City.mmdb';
+    resetGeoReader();
+    const status = await geoStatus();
+
+    assert.equal(status.diagnostics.parentExists, false);
+
+    const ancestor = status.diagnostics.readableAncestor;
+    assert.ok(ancestor, 'the walk must find somewhere readable, or there is nothing to act on');
+    assert.ok(
+      status.diagnostics.parentDir.startsWith(ancestor.path),
+      'the boundary reported must actually be an ancestor of the path that failed',
+    );
+    assert.ok(
+      Array.isArray(ancestor.entries),
+      'listing the boundary is the point — it shows whether the file is just one level off',
+    );
+  } finally {
+    if (original === undefined) delete process.env.GEOIP_DB_PATH;
+    else process.env.GEOIP_DB_PATH = original;
+    resetGeoReader();
+  }
+});
+
+test('the ancestor walk terminates at the filesystem root', async () => {
+  const original = process.env.GEOIP_DB_PATH;
+
+  try {
+    // A deeply nested path that cannot exist. The walk must end rather than
+    // spin — this renders on a page someone opens during an incident.
+    process.env.GEOIP_DB_PATH = '/a/b/c/d/e/f/g/h/i/j/k/GeoLite2-City.mmdb';
+    resetGeoReader();
+
+    const status = await geoStatus();
+    // Either it found the root or it gave up; both terminate. The assertion
+    // that matters is that we got here at all.
+    assert.equal(status.loaded, false);
+    assert.equal(status.fileExists, false);
+  } finally {
+    if (original === undefined) delete process.env.GEOIP_DB_PATH;
+    else process.env.GEOIP_DB_PATH = original;
+    resetGeoReader();
+  }
+});
+
 test('a corrected path is picked up without a restart', async () => {
   const original = process.env.GEOIP_DB_PATH;
 
