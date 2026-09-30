@@ -283,6 +283,24 @@ test('open redirects are refused: destination hosts must be allowlisted', () => 
   assert.doesNotThrow(() => assertSafeDestination('https://www.betindia.bet/promo'));
 });
 
+test('an allowlist entry pasted as a full URL still matches its host', () => {
+  const original = process.env.DESTINATION_HOST_ALLOWLIST;
+
+  try {
+    // A real production mistake: the list is matched against hostnames, so a
+    // pasted URL silently matched nothing and the destination looked broken.
+    process.env.DESTINATION_HOST_ALLOWLIST = 'https://wa.link/joinbetindia, www.betindia.bet';
+
+    assert.doesNotThrow(() => assertSafeDestination('https://wa.link/joinbetindia'));
+    assert.doesNotThrow(() => assertSafeDestination('https://wa.link/anything-else'));
+    assert.doesNotThrow(() => assertSafeDestination('https://www.betindia.bet/promo'));
+    assert.throws(() => assertSafeDestination('https://evil.example.com/'), UnsafeDestinationError);
+  } finally {
+    if (original === undefined) delete process.env.DESTINATION_HOST_ALLOWLIST;
+    else process.env.DESTINATION_HOST_ALLOWLIST = original;
+  }
+});
+
 test('an empty SMART_LINK_BASE_URL falls back rather than producing a relative URL', async () => {
   const { shortUrlBase, shortUrlFor } = await import('../src/services/smart-links');
   const original = process.env.SMART_LINK_BASE_URL;

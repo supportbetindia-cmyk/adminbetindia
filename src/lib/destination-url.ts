@@ -20,7 +20,14 @@ export class UnsafeDestinationError extends Error {}
 /** Hosts a destination is permitted to point at. Defence in depth behind the registry. */
 function allowedHosts(): string[] {
   const raw = process.env.DESTINATION_HOST_ALLOWLIST ?? '';
-  const configured = raw.split(',').map((h) => h.trim().toLowerCase()).filter(Boolean);
+  const configured = raw
+    .split(',')
+    .map((h) => h.trim().toLowerCase())
+    .filter(Boolean)
+    // Accept a pasted URL as well as a bare host. The list is matched against
+    // hostnames, so "https://wa.link/join" matches nothing — and in an env var
+    // that mistake is invisible until a destination is inexplicably refused.
+    .map((h) => h.replace(/^[a-z]+:\/\//, '').split('/')[0]);
   if (configured.length > 0) return configured;
   return ['betindia.bet', 'www.betindia.bet', 'wa.me', 'api.whatsapp.com', 'wa.link'];
 }
