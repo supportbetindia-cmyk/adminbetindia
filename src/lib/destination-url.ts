@@ -52,7 +52,12 @@ export function assertSafeDestination(url: string): URL {
   }
 
   if (!hostAllowed(parsed.hostname)) {
-    throw new UnsafeDestinationError(`Destination host is not allowlisted: ${parsed.hostname}`);
+    // Naming the effective list matters: DESTINATION_HOST_ALLOWLIST silently
+    // replaces the built-in default when set, so "not allowlisted" otherwise
+    // gives no way to tell a missing host from a stale env var.
+    throw new UnsafeDestinationError(
+      `Destination host is not allowlisted: ${parsed.hostname}. Allowed: ${allowedHosts().join(', ')}`,
+    );
   }
 
   return parsed;
