@@ -315,6 +315,14 @@ test('a WhatsApp destination must be a WhatsApp link, and vice versa', async () 
     () => createDestination(db, actor, { type: 'website', url: 'https://wa.me/919000000000' }),
     'validation_failed',
   );
+
+  // wa.link is an allowed WhatsApp shortener. It cannot carry the campaign
+  // code, so leads through it are unattributed — but registering it must work.
+  const shortened = await createDestination(db, actor, {
+    type: 'whatsapp',
+    url: 'https://wa.link/joinbetindia',
+  });
+  assert.equal(shortened.type, 'whatsapp');
 });
 
 test('approving a destination requires a recorded approval reference', async () => {

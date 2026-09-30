@@ -337,7 +337,15 @@ function assertUrlUsable(url: string, type: 'website' | 'whatsapp'): void {
     throw err;
   }
 
-  const isWhatsAppHost = /(^|\.)(wa\.me|api\.whatsapp\.com|whatsapp\.com)$/i.test(parsed.hostname);
+  /**
+   * wa.link is a WhatsApp shortener, allowed on request. It substitutes its own
+   * preset message and drops `?text=`, so the `[BI-…]` campaign code never
+   * reaches WhatsApp and leads through it arrive unattributed (CLAUDE.md rule
+   * 5). Clicks are unaffected — those are recorded before the redirect.
+   * ponytail: no per-destination attribution flag; add one when a lead gap
+   * needs explaining in reports.
+   */
+  const isWhatsAppHost = /(^|\.)(wa\.me|wa\.link|api\.whatsapp\.com|whatsapp\.com)$/i.test(parsed.hostname);
   if (type === 'whatsapp' && !isWhatsAppHost) {
     throw invalid('A WhatsApp destination must be a wa.me or api.whatsapp.com link.', {
       url: 'Not a WhatsApp link',

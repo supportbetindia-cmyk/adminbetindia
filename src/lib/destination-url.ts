@@ -22,7 +22,7 @@ function allowedHosts(): string[] {
   const raw = process.env.DESTINATION_HOST_ALLOWLIST ?? '';
   const configured = raw.split(',').map((h) => h.trim().toLowerCase()).filter(Boolean);
   if (configured.length > 0) return configured;
-  return ['betindia.bet', 'www.betindia.bet', 'wa.me', 'api.whatsapp.com'];
+  return ['betindia.bet', 'www.betindia.bet', 'wa.me', 'api.whatsapp.com', 'wa.link'];
 }
 
 function hostAllowed(hostname: string): boolean {
