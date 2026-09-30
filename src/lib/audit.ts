@@ -38,7 +38,7 @@ export function redact(value: unknown, depth = 0): unknown {
   return out;
 }
 
-export interface AuditInput {
+interface AuditInput {
   actor: SessionUser | null;
   action: string;
   entityType: string;

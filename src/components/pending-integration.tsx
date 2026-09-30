@@ -12,7 +12,7 @@
 import type { ReactNode } from 'react';
 import { Card, EmptyState, Notice } from './ui';
 
-export interface Blocker {
+interface Blocker {
   what: string;
   owner: string;
   consequence: string;

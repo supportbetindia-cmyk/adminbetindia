@@ -320,7 +320,7 @@ test('a WhatsApp destination must be a WhatsApp link, and vice versa', async () 
   // code, so leads through it are unattributed — but registering it must work.
   const shortened = await createDestination(db, actor, {
     type: 'whatsapp',
-    url: 'https://wa.link/joinbetindia',
+    url: `https://wa.link/join-${uniq()}`,
   });
   assert.equal(shortened.type, 'whatsapp');
 });

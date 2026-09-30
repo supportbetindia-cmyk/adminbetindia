@@ -14,7 +14,7 @@ import type { ReactNode } from 'react';
 import { formatMetric } from '@/lib/format';
 import type { Availability, Metric } from '@/services/reports';
 
-export type BadgeTone = 'ok' | 'warn' | 'danger' | 'info' | 'neutral';
+type BadgeTone = 'ok' | 'warn' | 'danger' | 'info' | 'neutral';
 
 export function Badge({ tone = 'neutral', children }: { tone?: BadgeTone; children: ReactNode }) {
   return (
@@ -50,7 +50,7 @@ const AVAILABILITY_LABEL: Record<Availability, string> = {
   unavailable: 'Not available',
 };
 
-export function AvailabilityTag({ availability }: { availability: Availability }) {
+function AvailabilityTag({ availability }: { availability: Availability }) {
   return (
     <span className={`avail avail--${availability}`}>
       <span aria-hidden>{AVAILABILITY_GLYPH[availability]}</span>

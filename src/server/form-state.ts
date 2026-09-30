@@ -18,7 +18,7 @@ export interface FormState {
 
 export const IDLE: FormState = { ok: false };
 
-export function formValues(data: FormData): Record<string, string> {
+function formValues(data: FormData): Record<string, string> {
   const out: Record<string, string> = {};
   for (const [key, value] of data.entries()) {
     if (typeof value === 'string') out[key] = value;

@@ -6,6 +6,7 @@ import { normalisePhone } from '@/lib/privacy';
 
 type Db = typeof Database;
 type Json = Record<string, any>;
+const messageKey = (value: string) => value.trim().toLowerCase();
 
 function payloadParts(payload: unknown) {
   const root = payload as Json;
@@ -32,19 +33,19 @@ export async function processInteraktInboxRow(db: Db, inboxId: string): Promise<
   }
 
   await db.transaction(async (tx) => {
-    const event = await tx.insert(whatsappEvents).values({
+    const [event] = await tx.insert(whatsappEvents).values({
       provider: 'interakt', providerEventId: String(parsed.message.id),
       providerMessageId: parsed.message.source_message_id ? String(parsed.message.source_message_id) : null,
       eventType: 'message_received', contactId: String(parsed.customer.id),
       occurredAt: parsed.occurredAt, campaignReference: null, payloadReference: inbox.id,
     }).onConflictDoNothing().returning({ id: whatsappEvents.id });
 
-    if (event.length > 0) {
-      const lead = await tx.insert(leads).values({ contactKey: parsed.phone, firstMessageAt: parsed.occurredAt })
+    if (event) {
+      const [lead] = await tx.insert(leads).values({ contactKey: parsed.phone, firstMessageAt: parsed.occurredAt })
         .onConflictDoNothing().returning({ id: leads.id });
-      if (lead.length > 0) {
+      if (lead) {
         await tx.insert(leadAttributions).values({
-          leadId: lead[0].id, clickId: null, campaignId: null, method: 'none', confidence: 'unknown',
+          leadId: lead.id, clickId: null, campaignId: null, method: 'none', confidence: 'unknown',
           evidenceReference: 'Inbound WhatsApp message confirmed; no banner reference was present.',
         });
       }
@@ -80,9 +81,11 @@ export async function listInteraktLeads(db: Db, revealPhone = false, limit = 500
   const linksByMessage = new Map<string, string[]>();
   for (const link of linkRows) {
     let text = '';
-    try { text = new URL(link.url).searchParams.get('text')?.trim().toLowerCase() ?? ''; } catch { /* invalid URLs are ignored */ }
+    try { text = messageKey(new URL(link.url).searchParams.get('text') ?? ''); } catch { /* invalid URLs are ignored */ }
     if (!text) continue;
-    linksByMessage.set(text, [...(linksByMessage.get(text) ?? []), link.slug]);
+    const slugs = linksByMessage.get(text);
+    if (slugs) slugs.push(link.slug);
+    else linksByMessage.set(text, [link.slug]);
   }
   const rows = await db.select({
     id: webhookInbox.id,
@@ -128,7 +131,7 @@ export async function listInteraktLeads(db: Db, revealPhone = false, limit = 500
   return [...contacts.values()].map((contact) => {
     const matching = new Set<string>();
     for (const message of contact.messages) {
-      for (const slug of linksByMessage.get(message.trim().toLowerCase()) ?? []) matching.add(slug);
+      for (const slug of linksByMessage.get(messageKey(message)) ?? []) matching.add(slug);
     }
     const sourceLinks = [...matching];
     return {

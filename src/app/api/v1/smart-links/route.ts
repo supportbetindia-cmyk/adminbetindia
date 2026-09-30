@@ -13,6 +13,8 @@ export const GET = route(async ({ actor, searchParams }) => {
     campaignId: q.campaignId,
     publisherId: q.publisherId,
     status: q.status as SmartLinkFilter['status'],
+    from: q.from,
+    to: q.to,
   };
   return json({ data: await listSmartLinks(db, actor, filter) });
 });

@@ -14,14 +14,16 @@ export const metadata = { title: 'Smart Links — Smart Link Manager' };
 export default async function SmartLinksPage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string }>;
+  searchParams: Promise<{ status?: string; from?: string; to?: string }>;
 }) {
   const actor = await requireActor('/smart-links');
   if (!can(actor.user.role, 'links:read')) return <PermissionDenied needed="links:read" />;
 
-  const { status } = await searchParams;
+  const { status, from, to } = await searchParams;
   const links = await listSmartLinks(db, actor, {
     status: status as 'draft' | 'active' | 'paused' | 'ended' | undefined,
+    from,
+    to,
   });
   const mayWrite = can(actor.user.role, 'links:write');
 
@@ -39,11 +41,23 @@ export default async function SmartLinksPage({
       />
 
       <div className="content">
+        <form method="get" className="row">
+          {status && <input type="hidden" name="status" value={status} />}
+          <label>From <input type="date" name="from" defaultValue={from} /></label>
+          <label>To <input type="date" name="to" defaultValue={to} /></label>
+          <button className="btn btn--primary" type="submit">Apply</button>
+          {(from || to) && <Link className="btn" href={status ? `/smart-links?status=${status}` : '/smart-links'}>Clear dates</Link>}
+        </form>
+
         <div className="row">
           {['', 'draft', 'active', 'paused', 'ended'].map((s) => (
             <Link
               key={s || 'all'}
-              href={s ? `/smart-links?status=${s}` : '/smart-links'}
+              href={`/smart-links?${new URLSearchParams({
+                ...(s ? { status: s } : {}),
+                ...(from ? { from } : {}),
+                ...(to ? { to } : {}),
+              })}`}
               className={`btn btn--sm${(status ?? '') === s ? ' btn--primary' : ''}`}
             >
               {s ? s[0].toUpperCase() + s.slice(1) : 'All'}
@@ -76,7 +90,7 @@ export default async function SmartLinksPage({
                     <th>Destination</th>
                     <th>Version</th>
                     <th>Status</th>
-                    <th className="num">Clicks</th>
+                    <th className="num">Clicks{(from || to) ? ' in range' : ''}</th>
                     <th>Created</th>
                   </tr>
                 </thead>

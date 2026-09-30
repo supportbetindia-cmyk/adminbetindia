@@ -9,12 +9,12 @@
 
 import Link from 'next/link';
 
-export interface FilterOption {
+interface FilterOption {
   value: string;
   label: string;
 }
 
-export interface FilterBarProps {
+interface FilterBarProps {
   action: string;
   from: string;
   to: string;

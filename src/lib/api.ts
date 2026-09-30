@@ -13,7 +13,7 @@ import { fieldErrors } from '@/lib/validation';
 import { currentActor } from '@/lib/auth/current';
 import type { ActorContext } from '@/lib/auth/context';
 
-export interface ApiErrorBody {
+interface ApiErrorBody {
   error: { code: string; message: string; fields?: Record<string, string> };
 }
 

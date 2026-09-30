@@ -1,18 +1,9 @@
 'use client';
-
-/**
- * Smart link creation and lifecycle controls (UI/UX §7).
- *
- * Historical links are ended rather than deleted.
- */
-
 import { useState } from 'react';
-import {
-  changeDestinationAction, createSmartLinkAction, setSmartLinkStatusAction,
-} from '@/server/actions';
+import { changeDestinationAction, createSmartLinkAction, setSmartLinkStatusAction,} from '@/server/actions';
 import { ActionForm, CopyButton, Field, InlineAction, Select, SubmitButton, TextArea, TextInput } from './form';
 
-export interface DestinationOption {
+interface DestinationOption {
   value: string;
   label: string;
   url: string;

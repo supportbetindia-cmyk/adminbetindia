@@ -1,18 +1,3 @@
-/**
- * Redirect engine — the core of the system.
- *
- * Implements TRD §5 and Backend Schema §9:
- *   1. validate link status, date window and approved destination version
- *   2. mint a cryptographically random click_id
- *   3. record the click durably BEFORE redirecting
- *   4. return 302 with a Location taken only from the approved registry
- *
- * "A click record must not depend on the destination successfully loading"
- * (TRD §5) — so the write happens first, and nothing about the user's browser
- * reaching the destination can change whether the click was counted.
- *
- * Kept free of Next.js types so it can be tested directly against the database.
- */
 
 import { and, eq } from 'drizzle-orm';
 import type { db as Database } from '@/db';
@@ -38,14 +23,10 @@ export interface RedirectRequest {
   signals: ClientSignals;
   referrer: string | null;
   ipHash: string | null;
-  /**
-   * Already resolved by the caller, which holds the raw IP. The address itself
-   * never enters this service or the database — only its salted hash and this
-   * estimate (PRD §13, Schema §8).
-   */
+ 
   geo?: GeoEstimate;
   visitorTokenHash: string | null;
-  /** Publisher click ID captured from an approved macro parameter. */
+
   publisherClickId: string | null;
   utm: {
     source: string | null;
@@ -65,7 +46,6 @@ export async function resolveAndRecordClick(
 ): Promise<RedirectOutcome> {
   const now = req.now ?? new Date();
 
-  // ── 1. resolve link, campaign, publisher, destination and pinned version ──
   const rows = await db
     .select({
       link: {
@@ -108,7 +88,7 @@ export async function resolveAndRecordClick(
   const row = rows[0];
   if (!row) return { status: 'not_found' };
 
-  // ── 2. validate ──────────────────────────────────────────────
+  
   if (row.link.status !== 'active') {
     return { status: 'not_active', reason: row.link.status as 'draft' | 'paused' | 'ended' };
   }
@@ -129,13 +109,12 @@ export async function resolveAndRecordClick(
     return { status: 'campaign_window' };
   }
 
-  // Never silently fall back to an unapproved destination (PRD §4).
   if (!row.version || !row.destination) return { status: 'no_approved_destination' };
   if (row.destination.approvalStatus !== 'approved') {
     return { status: 'no_approved_destination' };
   }
 
-  // ── 3. mint click ID and build the destination ───────────────
+  
   const clickId = generateClickId();
 
   let url: string;

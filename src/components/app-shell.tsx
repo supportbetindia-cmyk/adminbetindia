@@ -1,5 +1,5 @@
 /**
- * AppShell and Sidebar (UI/UX §3, §15).
+ * Admin navigation and page chrome (UI/UX §3, §15).
  *
  * Navigation is role-aware: a link is only rendered when the signed-in role
  * holds the permission behind it. §3 requires the interface to respect
@@ -104,17 +104,6 @@ export function AccountMenu({ user }: { user: SessionUser }) {
         <div className="account__role">{ROLE_LABELS[user.role]}</div>
       </div>
       <LogoutButton />
-    </div>
-  );
-}
-
-export function AppShell({
-  user, pathname, children,
-}: { user: SessionUser; pathname: string; children: ReactNode }) {
-  return (
-    <div className="shell">
-      <Sidebar role={user.role} pathname={pathname} />
-      <div className="main">{children}</div>
     </div>
   );
 }

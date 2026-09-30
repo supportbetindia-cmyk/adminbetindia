@@ -11,7 +11,7 @@
  *    ending a link is the terminal state.
  */
 
-import { and, desc, eq, sql } from 'drizzle-orm';
+import { and, desc, eq, gte, lte, sql, type SQL } from 'drizzle-orm';
 import type { db as Database } from '@/db';
 import {
   campaigns, clickEvents, creatives, destinations, destinationVersions, publishers, smartLinks,
@@ -46,6 +46,8 @@ export interface SmartLinkFilter {
   campaignId?: string;
   publisherId?: string;
   status?: SmartLink['status'];
+  from?: string;
+  to?: string;
 }
 
 /**
@@ -79,6 +81,12 @@ export async function listSmartLinks(
     filter.status ? eq(smartLinks.status, filter.status) : undefined,
   ].filter(Boolean);
 
+  const clickConditions = [
+    eq(clickEvents.smartLinkId, smartLinks.id),
+    filter.from ? gte(clickEvents.occurredAt, new Date(`${filter.from}T00:00:00.000Z`)) : undefined,
+    filter.to ? lte(clickEvents.occurredAt, new Date(`${filter.to}T23:59:59.999Z`)) : undefined,
+  ].filter(Boolean) as SQL[];
+
   const rows = await db
     .select({
       link: smartLinks,
@@ -95,7 +103,7 @@ export async function listSmartLinks(
     .innerJoin(publishers, eq(publishers.id, campaigns.publisherId))
     .leftJoin(creatives, eq(creatives.id, smartLinks.creativeId))
     .leftJoin(destinations, eq(destinations.id, smartLinks.activeDestinationId))
-    .leftJoin(clickEvents, eq(clickEvents.smartLinkId, smartLinks.id))
+    .leftJoin(clickEvents, and(...clickConditions))
     .where(conditions.length ? and(...conditions) : undefined)
     .groupBy(
       smartLinks.id, campaigns.name, publishers.id, publishers.name,

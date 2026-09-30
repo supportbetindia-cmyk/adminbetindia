@@ -10,7 +10,7 @@
 import { createCampaignAction, updateCampaignAction } from '@/server/actions';
 import { ActionForm, Field, Select, SubmitButton, TextArea, TextInput } from './form';
 
-export interface CampaignFormValues {
+interface CampaignFormValues {
   id?: string;
   publisherId?: string;
   name?: string;

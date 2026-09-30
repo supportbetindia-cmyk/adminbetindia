@@ -10,7 +10,7 @@
 import { createPublisherAction, updatePublisherAction } from '@/server/actions';
 import { ActionForm, CheckLine, Field, Select, SubmitButton, TextArea, TextInput } from './form';
 
-export interface PublisherFormValues {
+interface PublisherFormValues {
   id?: string;
   name?: string;
   status?: string;
