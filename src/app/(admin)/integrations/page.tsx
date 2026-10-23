@@ -100,15 +100,26 @@ export default async function IntegrationsPage() {
                 : <Badge tone="warn">Not loaded — location will be &ldquo;unavailable&rdquo;</Badge>}
             </div>
 
-            <div>
-              <span className="metric__label">Looking for the file at</span>
-              <div><code>{geo.configuredPath}</code></div>
-              <span className="field__hint">
-                {geo.pathFromEnv
-                  ? 'From GEOIP_DB_PATH.'
-                  : 'GEOIP_DB_PATH is not set, so the built-in default is being used. On managed hosting set it to an absolute path — a relative one depends on the working directory, which you do not control.'}
-              </span>
-            </div>
+            {geo.loaded ? (
+              <div>
+                <span className="metric__label">Loaded from</span>
+                <div><code>{geo.loadedFrom}</code></div>
+              </div>
+            ) : (
+              <div>
+                <span className="metric__label">
+                  Looked in these {geo.searchedPaths.length} places — put the file at any one
+                </span>
+                <ol className="small mono" style={{ margin: '6px 0 0', paddingLeft: 22, lineHeight: 1.7 }}>
+                  {geo.searchedPaths.map((p) => <li key={p}>{p}</li>)}
+                </ol>
+                <span className="field__hint">
+                  {geo.pathFromEnv
+                    ? 'The first entry is GEOIP_DB_PATH. It is tried first, and the rest are searched when it is not there — so a path that is right in your control panel but wrong inside the app no longer blocks it.'
+                    : 'GEOIP_DB_PATH is not set. These are searched upward from the working directory, so a location above the app survives every deploy.'}
+                </span>
+              </div>
+            )}
 
             <div className="row">
               <strong style={{ width: 150 }}>File present</strong>

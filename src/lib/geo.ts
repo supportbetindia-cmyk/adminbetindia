@@ -21,6 +21,7 @@
  */
 
 import { existsSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
 import type { Reader, CityResponse } from 'maxmind';
 
 export interface GeoEstimate {
@@ -89,9 +90,51 @@ function safeDecode(value: string): string {
 let reader: Reader<CityResponse> | null = null;
 let loadAttempted = false;
 
+const DB_FILENAME = 'GeoLite2-City.mmdb';
+
+/** Folders to look in at each level: a conventional name, or the level itself. */
+const SEARCH_SUBDIRS = ['data', 'geoip', '.'];
+
 function databasePath(): string {
-  return process.env.GEOIP_DB_PATH ?? './data/GeoLite2-City.mmdb';
+  return process.env.GEOIP_DB_PATH?.trim() || `./data/${DB_FILENAME}`;
 }
+
+/**
+ * Every path the database might be at, in priority order.
+ *
+ * GEOIP_DB_PATH is tried first and wins when it points at a real file. When it
+ * does not, the search continues rather than giving up: an absolute path that
+ * is correct in a control panel is routinely wrong inside the app, because
+ * managed hosting mounts only part of the account's disk, and the operator has
+ * no way to see that boundary.
+ *
+ * The fallback walks up from the working directory. On hosting that deploys
+ * into a versioned directory the app's absolute path changes on every push, so
+ * an ancestor search is the only locator that keeps working across deploys —
+ * put the file anywhere above the app in its own tree and it is found.
+ *
+ * Bounded at 8 levels and stopping at the filesystem root: this runs once, at
+ * boot, and must terminate.
+ */
+function candidatePaths(): string[] {
+  const paths: string[] = [];
+
+  const explicit = process.env.GEOIP_DB_PATH?.trim();
+  if (explicit) paths.push(explicit);
+
+  let dir = resolve(process.cwd());
+  for (let depth = 0; depth < 8; depth += 1) {
+    for (const sub of SEARCH_SUBDIRS) paths.push(join(dir, sub, DB_FILENAME));
+    const parent = dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
+
+  return [...new Set(paths)];
+}
+
+/** The path actually loaded, once a load has succeeded. */
+let loadedFrom: string | null = null;
 
 /**
  * Loads the database once, lazily.
@@ -105,22 +148,26 @@ async function getReader(): Promise<Reader<CityResponse> | null> {
   if (loadAttempted) return null;
   loadAttempted = true;
 
-  const path = databasePath();
-  if (!existsSync(path)) {
+  const candidates = candidatePaths();
+  const found = candidates.find((p) => existsSync(p));
+
+  if (!found) {
     console.warn(
-      `[geo] no GeoLite2 database at ${path} — location will be reported as unavailable. ` +
-      'Download GeoLite2-City.mmdb from MaxMind and set GEOIP_DB_PATH.',
+      `[geo] no ${DB_FILENAME} found — location will be reported as unavailable. ` +
+      `Looked in:\n  ${candidates.join('\n  ')}\n` +
+      'Put the file at one of these, or set GEOIP_DB_PATH to where it is.',
     );
     return null;
   }
 
   try {
     const maxmind = await import('maxmind');
-    reader = await maxmind.open<CityResponse>(path);
-    console.log(`[geo] GeoLite2 database loaded from ${path}`);
+    reader = await maxmind.open<CityResponse>(found);
+    loadedFrom = found;
+    console.log(`[geo] GeoLite2 database loaded from ${found}`);
     return reader;
   } catch (err) {
-    console.error('[geo] failed to load GeoLite2 database:', err);
+    console.error(`[geo] failed to load GeoLite2 database at ${found}:`, err);
     return null;
   }
 }
@@ -185,6 +232,10 @@ export interface GeoStatus {
   /** A live lookup of a known Indian IP, so the answer is proven not assumed. */
   sample: { ip: string; result: GeoEstimate } | null;
   error: string | null;
+  /** The path the database was actually loaded from, which may not be the configured one. */
+  loadedFrom: string | null;
+  /** Every path tried, in order — the list to pick a working location from. */
+  searchedPaths: string[];
   /** What the process can see around the path, for when the file is not found. */
   diagnostics: GeoDiagnostics;
 }
@@ -341,7 +392,7 @@ export async function geoStatus(): Promise<GeoStatus> {
    * successful retry populates the shared reader, so the redirect path starts
    * resolving too and this screen never claims more than clicks actually get.
    */
-  if (!reader && fileExists) resetGeoReader();
+  if (!reader && candidatePaths().some((p) => existsSync(p))) resetGeoReader();
 
   const db = await getReader();
   const sample = db
@@ -356,6 +407,8 @@ export async function geoStatus(): Promise<GeoStatus> {
     loaded: Boolean(db),
     sample,
     error,
+    loadedFrom,
+    searchedPaths: candidatePaths(),
     diagnostics: {
       cwd: process.cwd(),
       errorCode,
@@ -394,4 +447,5 @@ export async function warmGeoReader(): Promise<void> {
 export function resetGeoReader(): void {
   reader = null;
   loadAttempted = false;
+  loadedFrom = null;
 }
