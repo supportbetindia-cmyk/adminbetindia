@@ -41,15 +41,14 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
     includeFiltered: one(search, 'includeFiltered'),
   };
 
-  const [overview, performance, coverage, publishers, campaigns] = await Promise.all([
+  // One wave, not two. None of these depend on each other, and the database is
+  // far enough away that a second round of waiting is visible to the operator.
+  const [overview, performance, coverage, publishers, campaigns, rows, geo] = await Promise.all([
     overviewReport(db, actor, filter),
     publisherPerformance(db, actor, filter),
     attributionCoverage(db, actor, filter),
     can(actor.user.role, 'publishers:read') ? listPublishers(db, actor) : Promise.resolve([]),
     can(actor.user.role, 'campaigns:read') ? listSelectableCampaigns(db, actor) : Promise.resolve([]),
-  ]);
-
-  const [rows, geo] = await Promise.all([
     clickDetail(db, actor, filter, 200),
     geoBreakdown(db, actor, filter, 50),
   ]);

@@ -24,7 +24,25 @@ export const pool =
   new Pool({
     connectionString,
     max: Number(process.env.DB_POOL_MAX ?? 10),
-    idleTimeoutMillis: 30_000,
+
+    /*
+     * Connection setup, not query time, is what costs on this deployment.
+     *
+     * Measured: the redirect's SELECT executes in 1.2 ms, while the redirect
+     * itself takes 313-763 ms against a budget of p95 < 300 ms (TRD §15). The
+     * database is in Singapore and the app is not, so a cold connection pays
+     * TCP, TLS and Postgres startup — four or five round trips before a query
+     * is even sent.
+     *
+     * A 30 second idle timeout meant any gap in traffic threw that work away
+     * and the next visitor paid for it again. Holding connections open turns a
+     * redirect into one round trip instead of five.
+     */
+    idleTimeoutMillis: Number(process.env.DB_POOL_IDLE_MS ?? 600_000),
+    // Stops an idle socket being silently dropped by something in the middle
+    // and only being discovered on the next click.
+    keepAlive: true,
+    keepAliveInitialDelayMillis: 10_000,
     connectionTimeoutMillis: 5_000,
   });
 
