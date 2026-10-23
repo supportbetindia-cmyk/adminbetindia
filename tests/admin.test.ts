@@ -576,6 +576,42 @@ test('a destination change requires a publisher approval reference', async () =>
   );
 });
 
+test('the location breakdown says which link each place came from, busiest first', async () => {
+  const { geoBreakdown } = await import('../src/services/reports');
+
+  const actor = await actorWithRole('super_admin');
+  const publisher = await approvedPublisher(actor);
+  const campaign = await createCampaign(db, actor, { publisherId: publisher.id, name: 'Geo by link' });
+  const destination = await approvedDestination(actor);
+  const slug = `t-geoloc-${uniq()}`;
+
+  const link = await createSmartLink(db, actor, {
+    campaignId: campaign.id, slug, destinationId: destination.id,
+  });
+  await updateCampaign(db, actor, campaign.id, { status: 'active' });
+  await updateSmartLink(db, actor, link.id, { status: 'active' });
+
+  // Two clicks from Pune, one from Nagpur, so the ordering has something to get
+  // wrong. ORDER BY was written positionally and silently re-points at the
+  // wrong column when one is added — this is what catches that.
+  for (const [city, region] of [['Pune', 'Maharashtra'], ['Pune', 'Maharashtra'], ['Nagpur', 'Maharashtra']]) {
+    const outcome = await resolveAndRecordClick(db, {
+      ...clickRequest(slug),
+      geo: { city, region, country: 'IN', source: 'maxmind' as const },
+    });
+    assert.equal(outcome.status, 'redirect');
+  }
+
+  const rows = (await geoBreakdown(db, actor, {}, 50)).filter((r) => r.slug === slug);
+
+  assert.equal(rows.length, 2, 'one row per place, scoped to this link');
+  assert.equal(rows[0].city, 'Pune', 'the busiest place comes first');
+  assert.equal(rows[0].clicks, 2);
+  assert.equal(rows[1].city, 'Nagpur');
+  assert.equal(rows[1].clicks, 1);
+  assert.ok(rows.every((r) => r.slug === slug), 'every row names the link it came from');
+});
+
 test('withdrawing an approval stops the link redirecting straight away', async () => {
   const actor = await actorWithRole('super_admin');
   const publisher = await approvedPublisher(actor);

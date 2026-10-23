@@ -169,8 +169,8 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
         </Notice>
 
         <Card
-          title="Location"
-          description="Estimated from IP address. Never a measured fact (PRD §5) — and on Indian mobile traffic, carriers route through regional gateways, so a user in a smaller city often resolves to the state capital. Treat region as the trustworthy level and city as indicative."
+          title="Location by link"
+          description="Which link each click arrived on, and where it came from. Estimated from IP address, never a measured fact (PRD §5) — on Indian mobile traffic carriers route through regional gateways, so a user in a smaller city often resolves to the state capital. Treat region as the trustworthy level and city as indicative."
           flush
         >
           {geo.length === 0 ? (
@@ -180,13 +180,14 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
               <table className="data">
                 <thead>
                   <tr>
-                    <th>City</th><th>Region</th><th>Country</th>
+                    <th>Link</th><th>City</th><th>Region</th><th>Country</th>
                     <th className="num">Clicks</th><th className="num">Unique estimate</th>
                   </tr>
                 </thead>
                 <tbody>
                   {geo.map((row, i) => (
-                    <tr key={`${row.city ?? 'unknown'}-${row.region ?? ''}-${i}`}>
+                    <tr key={`${row.slug}-${row.city ?? 'unknown'}-${row.region ?? ''}-${i}`}>
+                      <td className="nowrap"><code>/c/{row.slug}</code></td>
                       <td>
                         {row.city ?? <span className="subtle">Unknown</span>}
                         {row.city && <span className="cell-sub">≈ estimate</span>}

@@ -523,6 +523,8 @@ export async function attributionCoverage(
 }
 
 export interface GeoRow {
+  /** Which link the traffic arrived on — location is useless without it. */
+  slug: string;
   city: string | null;
   region: string | null;
   country: string | null;
@@ -552,6 +554,7 @@ export async function geoBreakdown(
 
   return db
     .select({
+      slug: smartLinks.slug,
       city: clickEvents.geoCity,
       region: clickEvents.geoRegion,
       country: clickEvents.geoCountry,
@@ -561,8 +564,10 @@ export async function geoBreakdown(
     .from(clickEvents)
     .innerJoin(smartLinks, eq(smartLinks.id, clickEvents.smartLinkId))
     .where(and(...clickConditions(filter, window)))
-    .groupBy(clickEvents.geoCity, clickEvents.geoRegion, clickEvents.geoCountry)
-    .orderBy(sql`4 desc`)
+    .groupBy(smartLinks.slug, clickEvents.geoCity, clickEvents.geoRegion, clickEvents.geoCountry)
+    // Ordered by the expression rather than a column position: adding a column
+    // silently re-points a positional ORDER BY at the wrong one.
+    .orderBy(sql`count(*) desc`)
     .limit(limit);
 }
 
