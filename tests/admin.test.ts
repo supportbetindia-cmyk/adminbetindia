@@ -576,6 +576,30 @@ test('a destination change requires a publisher approval reference', async () =>
   );
 });
 
+test('a filter left on "All" is treated as no filter, not as invalid input', async () => {
+  const { overviewReport, geoBreakdown, clickDetail } = await import('../src/services/reports');
+  const actor = await actorWithRole('super_admin');
+
+  // Exactly what the filter bar submits when every select is left on "All":
+  // an HTML form sends each field it owns, so the value is "" rather than
+  // absent. Rejecting that took the whole Reports screen down.
+  const allBlank = {
+    from: '', to: '', publisherId: '', campaignId: '',
+    creativeId: '', smartLinkId: '', destinationType: '', device: '', includeFiltered: '',
+  };
+
+  await overviewReport(db, actor, allBlank);
+  await geoBreakdown(db, actor, allBlank, 10);
+  await clickDetail(db, actor, allBlank, 10);
+
+  // A genuinely malformed value must still be refused — blanks are ignored,
+  // not everything.
+  await rejects(
+    () => overviewReport(db, actor, { ...allBlank, publisherId: 'not-a-uuid' }),
+    'validation_failed',
+  );
+});
+
 test('the location breakdown says which link each place came from, busiest first', async () => {
   const { geoBreakdown } = await import('../src/services/reports');
 

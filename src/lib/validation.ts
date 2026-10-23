@@ -259,15 +259,26 @@ export const loginSchema = z.object({
 
 // ── Reports ──────────────────────────────────────────────────
 
+/**
+ * Treats an empty string as "not set".
+ *
+ * These filters arrive from a query string, and an HTML form submits every
+ * field it owns — a select left on "All" sends `publisherId=` rather than
+ * omitting it. Without this, choosing "All" fails validation and takes the
+ * whole Reports screen down with it.
+ */
+const blank = <T extends z.ZodTypeAny>(schema: T) =>
+  z.preprocess((v) => (v === '' ? undefined : v), schema.optional());
+
 export const reportFilterSchema = z.object({
-  from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
-  to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
-  publisherId: uuidSchema.optional(),
-  campaignId: uuidSchema.optional(),
-  creativeId: uuidSchema.optional(),
-  smartLinkId: uuidSchema.optional(),
-  destinationType: destinationTypeSchema.optional(),
-  device: z.enum(['mobile', 'tablet', 'desktop', 'unknown']).optional(),
+  from: blank(z.string().regex(/^\d{4}-\d{2}-\d{2}$/)),
+  to: blank(z.string().regex(/^\d{4}-\d{2}-\d{2}$/)),
+  publisherId: blank(uuidSchema),
+  campaignId: blank(uuidSchema),
+  creativeId: blank(uuidSchema),
+  smartLinkId: blank(uuidSchema),
+  destinationType: blank(destinationTypeSchema),
+  device: blank(z.enum(['mobile', 'tablet', 'desktop', 'unknown'])),
   /**
    * Bot-filtered clicks are excluded by default but never deleted. PRD §5:
    * raw counts are not silently altered — filtering happens at report time.
