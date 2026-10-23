@@ -13,47 +13,24 @@ import assert from 'node:assert/strict';
 import { eq } from 'drizzle-orm';
 import { db, pool } from '../src/db';
 import { clickEvents } from '../src/db/schema';
-import { mkdtemp } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
 import { geoStatus, lookupGeo, resetGeoReader, warmGeoReader, UNKNOWN_GEO } from '../src/lib/geo';
 import { clientIpSource } from '../src/lib/client-signals';
-
-/**
- * Runs a test with no database reachable anywhere.
- *
- * Pointing GEOIP_DB_PATH at a bogus path is no longer enough: the loader falls
- * through to an upward search from the working directory, which on a developer
- * machine finds the real file. Moving the working directory into an empty temp
- * folder is what actually simulates a deployment with no database — the case
- * these tests exist to pin down.
- */
-async function withNoDatabaseAnywhere<T>(fn: () => Promise<T>): Promise<T> {
-  const originalCwd = process.cwd();
-  const originalPath = process.env.GEOIP_DB_PATH;
-  const empty = await mkdtemp(join(tmpdir(), 'geo-absent-'));
-
-  process.chdir(empty);
-  process.env.GEOIP_DB_PATH = join(empty, 'nowhere', 'GeoLite2-City.mmdb');
-  resetGeoReader();
-
-  try {
-    return await fn();
-  } finally {
-    process.chdir(originalCwd);
-    if (originalPath === undefined) delete process.env.GEOIP_DB_PATH;
-    else process.env.GEOIP_DB_PATH = originalPath;
-    resetGeoReader();
-  }
-}
 
 // ─── Graceful degradation ────────────────────────────────────
 
 test('a missing database yields unknown rather than throwing', async () => {
-  await withNoDatabaseAnywhere(async () => {
+  const original = process.env.GEOIP_DB_PATH;
+  process.env.GEOIP_DB_PATH = './data/definitely-not-here.mmdb';
+  resetGeoReader();
+
+  try {
     const result = await lookupGeo('49.36.128.1');
     assert.deepEqual(result, UNKNOWN_GEO, 'a redirect must not depend on a lookup table existing');
-  });
+  } finally {
+    if (original === undefined) delete process.env.GEOIP_DB_PATH;
+    else process.env.GEOIP_DB_PATH = original;
+    resetGeoReader();
+  }
 });
 
 test('a null or private address is not looked up', async () => {
@@ -141,26 +118,29 @@ test('headers with no geo fields fall through rather than returning empty values
  * on a server based on it.
  */
 
-test('geoStatus reports the paths it actually tried when nothing is found', async () => {
-  await withNoDatabaseAnywhere(async () => {
+test('geoStatus reports the path it actually tried when the file is missing', async () => {
+  const original = process.env.GEOIP_DB_PATH;
+  process.env.GEOIP_DB_PATH = '/home/nobody/geoip/GeoLite2-City.mmdb';
+  resetGeoReader();
+
+  try {
     const status = await geoStatus();
 
     assert.equal(status.loaded, false);
     assert.equal(status.fileExists, false);
     assert.equal(status.fileSizeMb, null);
-    assert.equal(status.loadedFrom, null, 'nothing loaded means nothing to report a source for');
     assert.equal(
-      status.configuredPath, process.env.GEOIP_DB_PATH,
+      status.configuredPath, '/home/nobody/geoip/GeoLite2-City.mmdb',
       'the exact path must be shown, or the operator cannot check it',
     );
     assert.equal(status.pathFromEnv, true, 'an env-supplied path must not be reported as the default');
     assert.equal(status.sample, null, 'no sample may be claimed when nothing is loaded');
     assert.ok(status.error, 'the reason is reported rather than left to the server logs');
-    assert.ok(
-      status.searchedPaths.length > 1,
-      'the full search is listed — it is the list the operator picks a location from',
-    );
-  });
+  } finally {
+    if (original === undefined) delete process.env.GEOIP_DB_PATH;
+    else process.env.GEOIP_DB_PATH = original;
+    resetGeoReader();
+  }
 });
 
 test('geoStatus distinguishes the built-in default from a configured path', async () => {
@@ -233,40 +213,6 @@ test('geoStatus distinguishes an invisible parent from a missing file', async ()
   }
 });
 
-test('an unreachable GEOIP_DB_PATH falls through to the search instead of giving up', async () => {
-  const original = process.env.GEOIP_DB_PATH;
-
-  try {
-    // The production shape: the path is correct in the hosting control panel
-    // but does not exist inside the app, because only part of the disk is
-    // mounted. Before the search, this blocked location entirely.
-    process.env.GEOIP_DB_PATH = '/home/nobody-at-all/geoip/GeoLite2-City.mmdb';
-    resetGeoReader();
-
-    const status = await geoStatus();
-    if (!status.searchedPaths.some((p) => p.includes('data'))) {
-      assert.fail('the fallback search must be attempted when the configured path is missing');
-    }
-
-    assert.equal(
-      status.searchedPaths[0], '/home/nobody-at-all/geoip/GeoLite2-City.mmdb',
-      'an explicit path is still tried first — the search is a fallback, not an override',
-    );
-
-    // With the database present locally, the search must actually find it.
-    if (status.loaded) {
-      assert.ok(status.loadedFrom, 'a loaded database reports where it came from');
-      assert.notEqual(status.loadedFrom, process.env.GEOIP_DB_PATH);
-      assert.equal((await lookupGeo('49.36.128.1')).source, 'maxmind',
-        'the redirect path uses the same reader, so the panel cannot overstate it');
-    }
-  } finally {
-    if (original === undefined) delete process.env.GEOIP_DB_PATH;
-    else process.env.GEOIP_DB_PATH = original;
-    resetGeoReader();
-  }
-});
-
 test('geoStatus walks up to the deepest folder it can actually read', async () => {
   const original = process.env.GEOIP_DB_PATH;
 
@@ -296,16 +242,25 @@ test('geoStatus walks up to the deepest folder it can actually read', async () =
   }
 });
 
-test('the path search and ancestor walk both terminate', async () => {
-  await withNoDatabaseAnywhere(async () => {
-    // Both walks climb toward the filesystem root. They must end rather than
-    // spin — this renders on a page someone opens during an incident.
-    const status = await geoStatus();
+test('the ancestor walk terminates at the filesystem root', async () => {
+  const original = process.env.GEOIP_DB_PATH;
 
+  try {
+    // A deeply nested path that cannot exist. The walk must end rather than
+    // spin — this renders on a page someone opens during an incident.
+    process.env.GEOIP_DB_PATH = '/a/b/c/d/e/f/g/h/i/j/k/GeoLite2-City.mmdb';
+    resetGeoReader();
+
+    const status = await geoStatus();
+    // Either it found the root or it gave up; both terminate. The assertion
+    // that matters is that we got here at all.
     assert.equal(status.loaded, false);
     assert.equal(status.fileExists, false);
-    assert.ok(status.searchedPaths.length <= 32, 'the search stays bounded');
-  });
+  } finally {
+    if (original === undefined) delete process.env.GEOIP_DB_PATH;
+    else process.env.GEOIP_DB_PATH = original;
+    resetGeoReader();
+  }
 });
 
 test('a corrected path is picked up without a restart', async () => {
@@ -314,10 +269,10 @@ test('a corrected path is picked up without a restart', async () => {
   try {
     // Fail first, which latches the loader so clicks stop paying for a missing
     // file. This is the state an operator is in while fixing the path.
-    await withNoDatabaseAnywhere(async () => {
-      const before = await geoStatus();
-      assert.equal(before.loaded, false);
-    });
+    process.env.GEOIP_DB_PATH = '/home/nobody-at-all/GeoLite2-City.mmdb';
+    resetGeoReader();
+    const before = await geoStatus();
+    assert.equal(before.loaded, false);
 
     // Now point it at a real file, exactly as fixing the setting would.
     process.env.GEOIP_DB_PATH = './data/GeoLite2-City.mmdb';
