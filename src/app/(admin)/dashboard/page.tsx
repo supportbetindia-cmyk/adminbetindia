@@ -100,7 +100,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
 
         <Card
           title="Raw, filtered and counted clicks"
-          description="PRD §5: bot and fraud signals are recorded on the event and never silently alter raw counts. Filtering is applied here, at report time."
+          description="Suspected bot clicks are left out of these totals. Nothing is deleted."
         >
           <div className="row" style={{ gap: 40 }}>
             <div>
@@ -128,7 +128,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
 
         <Card
           title="Publisher performance"
-          description="First-party counts and publisher-reported counts are kept in separate columns. PRD §11 requires the discrepancy be shown, not reconciled away."
+          description="Your numbers and the publisher’s numbers, side by side. Where they disagree you see the gap rather than a blended figure."
           flush
         >
           {performance.length === 0 ? (
@@ -165,7 +165,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
                       </td>
                       <td className="num">{formatMetric(row.clicks)}</td>
                       <td className="num">{formatMetric(row.filteredClicks)}</td>
-                      <td className="num" title="Deduplicated estimate, not a count of people (PRD §5)">
+                      <td className="num" title="A rough count. Where we can tell, the same person clicking twice counts once.">
                         ≈ {formatMetric(row.uniqueEstimate)}
                       </td>
                       <td className="num"><NumberCell value={row.publisherReportedImpressions} /></td>
@@ -202,9 +202,8 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
             </div>
           </div>
           <Notice tone="warn" title="No attribution model is approved yet">
-            {coverage.note} TRD §10 proposes first eligible click within a 30-day window,
-            &ldquo;subject to business approval&rdquo; — that approval is item F2 on the outstanding
-            requirements checklist.
+            {coverage.note} The proposal is to credit the first click within 30 days, but nobody has
+            signed that off yet, so these numbers are provisional.
           </Notice>
         </Card>
       </div>

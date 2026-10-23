@@ -90,7 +90,7 @@ export default async function IntegrationsPage() {
 
         <Card
           title="Location lookup"
-          description="IP-derived city on each click. Optional — without a database, location records as unavailable and redirects are unaffected."
+          description="Shows the city each click came from. Optional — links work the same without it."
         >
           <div className="stack">
             <div className="row">
@@ -242,7 +242,7 @@ export default async function IntegrationsPage() {
 
             {geo.loaded && (
               <p className="small muted">
-                City is always an estimate (PRD §5). On Indian mobile traffic especially, carriers
+                City is always an estimate. On Indian mobile traffic especially, carriers
                 route through regional gateways, so a user in a smaller town often resolves to the
                 state capital. Region is the level worth trusting.
               </p>
@@ -300,7 +300,7 @@ export default async function IntegrationsPage() {
 
             <Card
               title="Raw captured events"
-              description="Exactly as received. Credential-bearing header values are replaced with a descriptor — enough to identify the auth scheme without storing the secret."
+              description="Exactly as received. Passwords and keys are hidden."
               flush
             >
               <div className="table-wrap">

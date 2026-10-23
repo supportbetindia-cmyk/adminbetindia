@@ -142,7 +142,7 @@ export function PermissionDenied({ needed }: { needed: string }) {
         body={
           <>
             This screen needs the <code>{needed}</code> permission. Roles are defined in
-            PRD §3 — ask a Super Admin if you need access.
+            Ask a Super Admin if you need access.
           </>
         }
       />

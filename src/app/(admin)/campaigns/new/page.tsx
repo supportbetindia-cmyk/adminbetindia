@@ -47,7 +47,7 @@ export default async function NewCampaignPage() {
             <Notice tone="info" title="Activation preconditions">
               A campaign can only go active once its publisher is marked eligible, has approved the
               tracking URL, has approved the destination type in use, and at least one of its links
-              points at an approved destination (PRD §4, TRD §13, UI/UX §6).
+              points at an approved destination.
             </Notice>
 
             <Card>

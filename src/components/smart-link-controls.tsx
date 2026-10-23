@@ -82,7 +82,7 @@ export function SmartLinkForm({
               label="Expires"
               name="expiresAt"
               error={state.fields?.expiresAt}
-              hint="Leave blank so the link never expires — that is the usual choice. Set a date only for a campaign with a hard end, and remember to set the time too."
+              hint="Leave blank so the link never expires. That is usually what you want."
             >
               <TextInput name="expiresAt" type="datetime-local" error={state.fields?.expiresAt} />
             </Field>
@@ -180,7 +180,7 @@ export function ChangeDestinationForm({
               name="approvalReference"
               required
               error={state.fields?.approvalReference}
-              hint="A destination change may itself need publisher approval (PRD §11, TRD §13)."
+              hint="A destination change may itself need publisher approval."
             >
               <TextInput name="approvalReference" required error={state.fields?.approvalReference} />
             </Field>

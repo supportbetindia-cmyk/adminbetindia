@@ -28,7 +28,7 @@ export function LoginForm({ next }: { next: string }) {
           <SubmitButton>Sign in</SubmitButton>
 
           <p className="small muted">
-            Accounts are created by a Super Admin. TRD §14 requires MFA for privileged
+            Accounts are created by a Super Admin. Two-step login for admin
             users — enrolment is not built yet and is tracked as an open item.
           </p>
         </>

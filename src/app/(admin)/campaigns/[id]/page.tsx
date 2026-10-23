@@ -167,7 +167,7 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
           {costs.length === 0 ? (
             <EmptyState
               title="No spend recorded"
-              body="Cost-per-click, cost-per-lead and cost-per-FTD show N/A until spend is imported. PRD §16 requires the cost import process to be confirmed."
+              body="Cost figures stay blank until campaign spend is imported."
             />
           ) : (
             <div className="table-wrap">

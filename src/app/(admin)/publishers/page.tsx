@@ -40,7 +40,7 @@ export default async function PublishersPage() {
 
       <div className="content">
         <PageHint>
-          TRD §13: only capabilities explicitly approved by the publisher may be enabled. A campaign
+          Only switch on what this publisher has actually approved in writing. A campaign
           cannot be activated until its publisher is marked eligible, has approved the tracking URL,
           and has approved the destination type in use.
         </PageHint>

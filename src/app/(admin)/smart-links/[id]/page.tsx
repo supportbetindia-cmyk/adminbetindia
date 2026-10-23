@@ -71,7 +71,7 @@ export default async function SmartLinkDetailPage({ params }: { params: Promise<
           <Notice tone="danger" title="This link has no approved destination">
             Its destination is <strong>{link.destinationApproval ?? 'missing'}</strong>. Clicks are
             refused with a 503 and no redirect is issued — the engine never falls back to a guessed
-            URL (PRD §4).
+            URL.
           </Notice>
         )}
 
@@ -117,7 +117,7 @@ export default async function SmartLinkDetailPage({ params }: { params: Promise<
 
         <Card
           title="Destination version history"
-          description="Every click stores the version it used. Changing the destination appends a version and never rewrites what came before (Backend Schema §3)."
+          description="Changing the destination adds a new version. Past clicks keep the one they used."
           flush
         >
           <div className="table-wrap">
@@ -192,10 +192,10 @@ export default async function SmartLinkDetailPage({ params }: { params: Promise<
                   </table>
                 </div>
                 <p className="small muted" style={{ marginTop: 10 }}>
-                  City is an estimate, never a measured fact (PRD §5). On Indian mobile traffic
-                  carriers route through regional gateways, so a user in a smaller town often
-                  resolves to the state capital — region is the level worth trusting. Unique
-                  visitors are a deduplicated estimate, not a person count.
+                  City is a best guess from the IP address, not a fact. Indian mobile networks route
+                  through regional hubs, so someone in a small town often shows up as the state
+                  capital — trust the region more than the city. Unique is a rough count, not a
+                  headcount of people.
                 </p>
               </>
             )}

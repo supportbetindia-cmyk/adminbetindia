@@ -67,7 +67,7 @@ export default async function SmartLinksPage({
 
         <PageHint>
           Links are never deleted. Ending one stops traffic while keeping its click history intact,
-          because deleting it would destroy historical attribution (UI/UX §7).
+          because deleting it would destroy historical attribution.
         </PageHint>
 
         <Card flush>

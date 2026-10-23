@@ -36,7 +36,7 @@ export default async function DestinationsPage() {
     <>
       <PageHeader
         title="Destinations"
-        description="The allowlisted registry every redirect resolves against."
+        description="The approved list of places your links are allowed to send people."
         actions={<AccountMenu user={actor.user} />}
       />
 
@@ -45,7 +45,7 @@ export default async function DestinationsPage() {
           A destination is registered as <strong>pending</strong> and can carry no traffic. Approving
           it requires a recorded publisher approval reference. Withdrawing an approval stops every
           link pointing at it, immediately. The URL itself is never editable — historical clicks pin
-          the version they used (Backend Schema §3).
+          the version they used.
           {!mayApprove && mayWrite && (
             <> Your role can register a destination but not approve one; ask a Super Admin.</>
           )}

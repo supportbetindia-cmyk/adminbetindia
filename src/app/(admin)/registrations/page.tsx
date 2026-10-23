@@ -61,7 +61,7 @@ export default async function RegistrationsPage() {
             <>
               A registration requires an <strong>actual external user ID and a completed
               account</strong>, delivered from an authorized server. A form submission is not a
-              registration (PRD §6, TRD §9) — those appear in the website funnel instead.
+              registration — those appear in the website funnel instead.
             </>
           }
           ceiling={
@@ -127,7 +127,7 @@ export default async function RegistrationsPage() {
           <Notice tone="warn" title={`${summary.unknown} registration(s) could not be traced to an ad`}>
             Usually one of: the visitor arrived without clicking a smart link, the click ID was not
             passed through the signup, the cookie expired, or they clicked on one device and
-            registered on another. TRD §10 forbids distributing these across campaigns to make the
+            registered on another. These are never spread across campaigns to make the
             report look complete, so they are counted here and nowhere else.
           </Notice>
         )}
@@ -135,7 +135,7 @@ export default async function RegistrationsPage() {
         {summary.byCreative.length > 0 && (
           <Card
             title="Which ad produced registrations"
-            description="Grouped by the creative that was actually clicked, taken from the click record rather than the campaign's current settings."
+            description="Grouped by the ad the person actually clicked, not the campaign’s current settings."
             flush
           >
             <div className="table-wrap">
@@ -236,10 +236,9 @@ export default async function RegistrationsPage() {
           Matching is an exact click-ID join — the strongest available, and the only kind accepted
           here. There is deliberately no fallback that guesses from timing or device.
           <br /><br />
-          The attribution <strong>model</strong> is still unapproved: TRD §10 proposes first
-          eligible click within a 30-day window, subject to business sign-off. Every decision is
-          stamped with its policy version, so they can all be recomputed if a different model is
-          chosen.
+          How credit gets assigned is still undecided. The proposal is to credit the first click
+          within 30 days, but it has not been signed off. Every match records which rule was used,
+          so everything can be recalculated if a different rule is chosen.
         </Notice>
       </div>
     </>

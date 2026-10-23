@@ -602,7 +602,10 @@ test('the location breakdown says which link each place came from, busiest first
     assert.equal(outcome.status, 'redirect');
   }
 
-  const rows = (await geoBreakdown(db, actor, {}, 50)).filter((r) => r.slug === slug);
+  // Scoped in the query, not filtered afterwards: geoBreakdown applies its
+  // LIMIT server-side, so a post-hoc filter silently loses rows as the
+  // database fills up.
+  const rows = await geoBreakdown(db, actor, { smartLinkId: link.id }, 50);
 
   assert.equal(rows.length, 2, 'one row per place, scoped to this link');
   assert.equal(rows[0].city, 'Pune', 'the busiest place comes first');

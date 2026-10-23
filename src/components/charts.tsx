@@ -49,7 +49,7 @@ export function TrendChart({ points }: { points: TrendPoint[] }) {
         </span>
         <span className="legend__key">
           <span className="legend__swatch" style={{ background: 'var(--border-strong)' }} aria-hidden />
-          Flagged as bot or link preview — recorded, excluded from counts (PRD §5)
+          Flagged as bot or link preview — recorded, excluded from counts
         </span>
         <span className="legend__key">Peak day: {formatMetric(max)}</span>
       </div>
@@ -98,7 +98,7 @@ export function Funnel({ report }: { report: FunnelReport }) {
           <p className="card__desc">
             {report.channel === 'whatsapp'
               ? 'A redirect is not an open, and an open is not a lead. Each stage needs its own observable event.'
-              : 'Each stage needs a confirmed first-party event. Missing stages stay missing.'}
+              : 'Each stage needs a confirmed event from your own systems. Missing stages stay missing.'}
           </p>
         </div>
       </div>

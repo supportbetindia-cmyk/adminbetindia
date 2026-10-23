@@ -53,7 +53,7 @@ export default async function CampaignsPage({
 
         <PageHint>
           Clicks below are raw counts against the campaign. Bot and link-preview filtering is applied
-          on the Dashboard and in Reports, never to the stored events (PRD §5).
+          on the Dashboard and in Reports, never to the stored events.
         </PageHint>
 
         <Card flush>

@@ -45,7 +45,7 @@ export function DestinationForm({
               required
               wide
               error={state.fields?.url}
-              hint="Must be https and on an allowlisted host. The URL cannot be edited later — register a new destination and move the link instead, so historical clicks keep their original target."
+              hint="Must start with https and use an approved domain. You cannot edit this later — add a new destination instead."
             >
               <TextInput
                 name="url" type="url" required
@@ -93,7 +93,7 @@ export function ApproveForm({ id }: { id: string }) {
             name={`approvalReference-${id}`}
             required
             error={state.fields?.approvalReference}
-            hint="TRD §13 requires recorded approval evidence."
+            hint="Record where the publisher approved this — an email, IO number or ticket."
           >
             <input
               id={`approvalReference-${id}`}

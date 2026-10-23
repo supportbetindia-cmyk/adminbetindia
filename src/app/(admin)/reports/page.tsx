@@ -89,7 +89,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
 
         <Card
           title="Cost per result"
-          description="Computed only from measured clicks and imported spend. Every stage below the click has no connected source, so its cost column reads N/A."
+          description="Worked out from clicks and imported spend. Everything after the click shows N/A until those sources are connected."
         >
           <div className="table-wrap">
             <table className="data">
@@ -120,14 +120,14 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
             </table>
           </div>
           <p className="small muted" style={{ marginTop: 12 }}>
-            ROAS and ROI are not shown. TRD §11 permits them only after revenue, cost and accounting
+            ROAS and ROI are not shown yet. They need agreed revenue, cost and accounting
             definitions are approved, and deposits are not automatically revenue or profit.
           </p>
         </Card>
 
         <Card
           title="Reconciliation"
-          description="Publisher-reported figures against first-party counts. A permanent gap is expected; agree in advance whose number is used for billing."
+          description="The publisher’s numbers against yours. Some gap is normal — agree upfront whose number you pay on."
           flush
         >
           {performance.length === 0 ? (
@@ -170,7 +170,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
 
         <Card
           title="Location by link"
-          description="Which link each click arrived on, and where it came from. Estimated from IP address, never a measured fact (PRD §5) — on Indian mobile traffic carriers route through regional gateways, so a user in a smaller city often resolves to the state capital. Treat region as the trustworthy level and city as indicative."
+          description="Where clicks came from, and which link they arrived on."
           flush
         >
           {geo.length === 0 ? (
@@ -201,6 +201,13 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
                 </tbody>
               </table>
             </div>
+          )}
+          {geo.length > 0 && (
+            <p className="small muted" style={{ padding: '10px 16px 14px', margin: 0 }}>
+              City is a best guess from the IP address, not a fact. Indian mobile networks route
+              through regional hubs, so someone in a small town often shows up as the state
+              capital — trust the region more than the city.
+            </p>
           )}
         </Card>
 

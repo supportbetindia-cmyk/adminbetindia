@@ -108,7 +108,7 @@ export function CostForm({ campaignId, currency }: { campaignId: string; currenc
               name="source"
               required
               error={state.fields?.source}
-              hint="Where this figure came from. Re-entering the same date and source corrects the figure rather than adding to it."
+              hint="Entering the same date and source again corrects the figure instead of adding to it."
             >
               <TextInput name="source" required placeholder="publisher_invoice" error={state.fields?.source} />
             </Field>
@@ -119,7 +119,7 @@ export function CostForm({ campaignId, currency }: { campaignId: string; currenc
           <div className="row">
             <SubmitButton>Record spend</SubmitButton>
             <span className="small muted">
-              ROI and ROAS are not calculated. TRD §11 puts them behind approved accounting definitions.
+              ROI and ROAS are not calculated yet — they need agreed accounting definitions first.
             </span>
           </div>
         </>

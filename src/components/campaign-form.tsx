@@ -112,7 +112,7 @@ export function CampaignForm({
                 label="Attribution window (days)"
                 name="attributionWindowDays"
                 error={state.fields?.attributionWindowDays}
-                hint="TRD §10 proposes 30 days, subject to business approval. Not yet approved."
+                hint="30 days is the proposed default. Still waiting on business approval."
               >
                 <TextInput
                   name="attributionWindowDays" type="number" min="1" max="90"

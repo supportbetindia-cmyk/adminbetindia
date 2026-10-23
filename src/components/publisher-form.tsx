@@ -62,7 +62,7 @@ export function PublisherForm({ publisher }: { publisher?: PublisherFormValues }
               <Field
                 label="Eligibility"
                 name="eligibility"
-                hint="TRD §13: mark ineligible if the campaign category or destination is prohibited on this inventory."
+                hint="Mark ineligible if this publisher does not allow this kind of campaign or destination."
               >
                 <Select
                   name="eligibility"
@@ -90,7 +90,7 @@ export function PublisherForm({ publisher }: { publisher?: PublisherFormValues }
 
             <fieldset style={{ border: '1px solid var(--border)', borderRadius: 'var(--r-card)', padding: 'var(--s5)' }}>
               <legend style={{ padding: '0 8px', fontWeight: 600, fontSize: 14 }}>
-                Written approvals (PRD §11, TRD §13)
+                Written approvals
               </legend>
 
               <div className="stack">
@@ -143,7 +143,7 @@ export function PublisherForm({ publisher }: { publisher?: PublisherFormValues }
                 <CheckLine
                   name="postbacksAllowed"
                   label="Conversion postbacks to this publisher are permitted"
-                  hint="Postbacks must use approved fields only and minimise personal data (TRD §13)."
+                  hint="Postbacks must use approved fields only and minimise personal data."
                   defaultChecked={publisher?.postbacksAllowed}
                 />
 

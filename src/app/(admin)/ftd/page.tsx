@@ -33,13 +33,13 @@ export default async function FtdPage() {
             An FTD is the <strong>first genuine completed deposit</strong> for a verified user.
             Pending, failed, reversed and promotional credits are excluded. It is never inferred from
             a CTA click or an unverified payment event, and a duplicate delivery of the same
-            transaction never counts twice (PRD §8, TRD §9, Backend Schema §9).
+            transaction never counts twice.
           </>
         }
         ceiling={
           <>
             Deposits are not automatically revenue or profit. ROAS and ROI stay unavailable until
-            revenue, cost and accounting definitions are approved (PRD §10, TRD §11) — this screen
+            revenue, cost and accounting definitions are approved — this screen
             will show deposit counts and amounts, not profit.
           </>
         }

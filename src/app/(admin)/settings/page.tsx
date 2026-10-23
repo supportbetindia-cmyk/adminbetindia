@@ -48,14 +48,14 @@ export default async function SettingsPage() {
     <>
       <PageHeader
         title="Settings"
-        description="Roles, allowlists, attribution policy and integration status."
+        description="Roles, approved domains, how credit is assigned, and what is connected."
         actions={<AccountMenu user={actor.user} />}
       />
 
       <div className="content">
         {!actor.user.mfaEnrolled && (
           <Notice tone="warn" title="MFA is not enrolled">
-            TRD §14 requires multi-factor authentication for privileged users. Enrolment is not built
+            Admin accounts should have two-step login. It is not built
             in this feature, and this warning stays until it is. Sessions are server-side and
             revocable, and sign-in is rate limited, but neither replaces MFA.
           </Notice>
@@ -68,7 +68,7 @@ export default async function SettingsPage() {
                 <tr>
                   <th style={{ width: 260 }}>Model</th>
                   <td>
-                    First eligible acquisition click, proposed in TRD §10{' '}
+                    First eligible click — proposed, not yet approved{' '}
                     <Badge tone="warn">Not approved</Badge>
                     <span className="cell-sub">
                       &ldquo;subject to business approval&rdquo;. Until approved, no conversion is attributed.
@@ -80,7 +80,7 @@ export default async function SettingsPage() {
                   <td>
                     30 days by default, configurable per campaign
                     <span className="cell-sub">
-                      Safari deletes script-set first-party cookies after seven days, and publisher
+                      Safari deletes cookies set by scripts after seven days, and publisher
                       in-app browsers often do not share storage with the real browser. Expect a
                       meaningful share of iOS and in-app traffic to fall out of the window.
                     </span>
@@ -90,7 +90,7 @@ export default async function SettingsPage() {
                   <th>Unmatched conversions</th>
                   <td>
                     Stay in an unknown bucket
-                    <span className="cell-sub">TRD §10 forbids distributing them across campaigns.</span>
+                    <span className="cell-sub">They are never spread across campaigns to fill gaps.</span>
                   </td>
                 </tr>
                 <tr>
@@ -116,8 +116,8 @@ export default async function SettingsPage() {
                   <td>
                     <Badge tone="danger">Not defined</Badge>
                     <span className="cell-sub">
-                      PRD §13 and TRD §14 require a retention and deletion schedule plus an Indian
-                      legal review before production. Neither exists yet.
+                      A schedule for how long data is kept and when it is deleted is still needed, plus an
+                      Indian legal review. Neither exists yet.
                     </span>
                   </td>
                 </tr>
@@ -127,8 +127,8 @@ export default async function SettingsPage() {
         </Card>
 
         <Card
-          title="Destination host allowlist"
-          description="A destination URL must be https and on one of these hosts. Checked when a destination is registered, again when it is approved, and again on every redirect."
+          title="Approved destination domains"
+          description="Links can only send people to these domains. Checked every single time someone clicks."
         >
           <div className="row">
             {allowlistedHosts().map((host) => <Badge key={host} tone="info">{host}</Badge>)}
@@ -162,12 +162,12 @@ export default async function SettingsPage() {
 
         <Card
           title="Roles and permissions"
-          description="The five roles from PRD §3. Two mappings need business sign-off; they are marked in lib/auth/rbac.ts."
+          description="What each role is allowed to do. Two of these still need sign-off from the business."
           flush
         >
           <div className="table-wrap">
             <table className="data">
-              <thead><tr><th>Role</th><th>PRD §3 description</th><th>Permissions</th></tr></thead>
+              <thead><tr><th>Role</th><th>What it is for</th><th>Permissions</th></tr></thead>
               <tbody>
                 {ADMIN_ROLES.map((role) => (
                   <tr key={role}>
