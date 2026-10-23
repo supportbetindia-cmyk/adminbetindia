@@ -8,6 +8,7 @@ import {
   getSmartLink, previewDestination, shortUrlFor,
 } from '@/services/smart-links';
 import { listApprovedDestinations, listDestinationHistory } from '@/services/destinations';
+import { geoBreakdown } from '@/services/reports';
 import { entityHistory } from '@/services/audit-log';
 import { formatDateTime, formatMetric } from '@/lib/format';
 import { AccountMenu, PageHeader } from '@/components/app-shell';
@@ -23,13 +24,25 @@ export default async function SmartLinkDetailPage({ params }: { params: Promise<
   if (!can(actor.user.role, 'links:read')) return <PermissionDenied needed="links:read" />;
 
   const link = await getSmartLink(db, actor, id);
-  const [versions, audit, destinations] = await Promise.all([
+  const [versions, audit, destinations, locations] = await Promise.all([
     listDestinationHistory(db, actor, id),
     can(actor.user.role, 'audit:read') ? entityHistory(db, actor, 'smart_link', id) : [],
     can(actor.user.role, 'links:write')
       ? listApprovedDestinations(db, actor, link.publisherId)
       : Promise.resolve([]),
+    // Scoped to this link alone. Reporting is a separate permission from
+    // reading a link, so a role without it simply gets no card.
+    can(actor.user.role, 'reports:read')
+      ? geoBreakdown(db, actor, { smartLinkId: id }, 10)
+      : Promise.resolve([]),
   ]);
+
+  // Rows with no location are counted, never dropped: a breakdown that hides
+  // the traffic it could not place reads as complete when it is not (TRD §10).
+  const placed = locations.filter((l) => l.city || l.region || l.country);
+  const unplaced = locations
+    .filter((l) => !l.city && !l.region && !l.country)
+    .reduce((sum, l) => sum + l.clicks, 0);
 
   // Built by the same function the redirect engine uses, so the preview cannot
   // disagree with what a real click does.
@@ -130,6 +143,64 @@ export default async function SmartLinkDetailPage({ params }: { params: Promise<
             </table>
           </div>
         </Card>
+
+        {can(actor.user.role, 'reports:read') && (
+          <Card
+            title="Where these clicks came from"
+            description="Estimated location of clicks on this link, last 30 days."
+          >
+            {placed.length === 0 ? (
+              <Notice tone="info" title="No location recorded for this link yet">
+                {unplaced > 0
+                  ? <>All {formatMetric(unplaced)} clicks in this window recorded location as
+                      unavailable. That is what happens when the GeoLite2 database is not loaded —
+                      the Integrations screen reports whether it is.</>
+                  : <>No clicks in this window. Location is derived at click time, so it only
+                      appears on traffic received after the database is in place.</>}
+              </Notice>
+            ) : (
+              <>
+                <div className="table-wrap">
+                  <table className="data">
+                    <thead>
+                      <tr>
+                        <th>City</th>
+                        <th>Region</th>
+                        <th>Country</th>
+                        <th className="num">Clicks</th>
+                        <th className="num">Unique (est.)</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {placed.map((l) => (
+                        <tr key={`${l.country}-${l.region}-${l.city}`}>
+                          <td>{l.city ?? <span className="subtle">—</span>}</td>
+                          <td>{l.region ?? <span className="subtle">—</span>}</td>
+                          <td>{l.country ?? <span className="subtle">—</span>}</td>
+                          <td className="num">{formatMetric(l.clicks)}</td>
+                          <td className="num">{formatMetric(l.uniqueEstimate)}</td>
+                        </tr>
+                      ))}
+                      {unplaced > 0 && (
+                        <tr>
+                          <td colSpan={3}><span className="subtle">Location unavailable</span></td>
+                          <td className="num">{formatMetric(unplaced)}</td>
+                          <td className="num"><span className="subtle">—</span></td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+                <p className="small muted" style={{ marginTop: 10 }}>
+                  City is an estimate, never a measured fact (PRD §5). On Indian mobile traffic
+                  carriers route through regional gateways, so a user in a smaller town often
+                  resolves to the state capital — region is the level worth trusting. Unique
+                  visitors are a deduplicated estimate, not a person count.
+                </p>
+              </>
+            )}
+          </Card>
+        )}
 
         {mayWrite && (
           <Card title="Change destination" description="Points this link at a different approved destination.">
